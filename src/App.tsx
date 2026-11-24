@@ -23,6 +23,7 @@ import type {
   PlaylistDetailResponse,
   SearchVideosResponse,
 } from './types';
+import { safeFetchJson } from './utils/api';
 
 interface RecentChannel {
   title: string;
@@ -365,13 +366,9 @@ export default function App() {
       }
 
       try {
-        const res = await fetch(
+        const data = await safeFetchJson<ChannelTabResponse>(
           `/api/channel?q=${encodeURIComponent(channelInput)}&tab=${encodeURIComponent(tab)}`
         );
-        const data = (await res.json()) as ChannelTabResponse & { error?: string };
-        if (!res.ok) {
-          throw new Error(data.error || 'Could not load that channel.');
-        }
 
         const taggedItems = (data.items || []).map((it) => ({
           ...it,
@@ -411,9 +408,7 @@ export default function App() {
         if (seedsToUse.length > 0) params.set('seeds', seedsToUse.join('||'));
         if (excludeParam) params.set('exclude', excludeParam);
 
-        const res = await fetch(`/api/feed?${params.toString()}`);
-        const data = (await res.json()) as FeedResponse & { error?: string };
-        if (!res.ok) throw new Error(data.error || 'Could not load feed.');
+        const data = await safeFetchJson<FeedResponse>(`/api/feed?${params.toString()}`);
         setFeedItems(data.items || []);
       } catch (err) {
         setFeedError(err instanceof Error ? err.message : 'Unable to load feed.');
@@ -448,9 +443,9 @@ export default function App() {
       }
 
       try {
-        const res = await fetch(`/api/search-videos?q=${encodeURIComponent(trimmed)}&channels=0`);
-        const data = (await res.json()) as SearchVideosResponse & { error?: string };
-        if (!res.ok) throw new Error(data.error || 'Could not search videos.');
+        const data = await safeFetchJson<SearchVideosResponse>(
+          `/api/search-videos?q=${encodeURIComponent(trimmed)}&channels=0`
+        );
 
         let finalVideos = data.videos || [];
         if (autoplayItem) {
@@ -474,17 +469,14 @@ export default function App() {
     if (!searchContinuation || loadingMoreSearch) return;
     setLoadingMoreSearch(true);
     try {
-      const res = await fetch('/api/search-videos/more', {
+      const data = await safeFetchJson<{
+        videos?: MediaItem[];
+        continuation?: ContinuationInfo | null;
+      }>('/api/search-videos/more', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ continuation: searchContinuation }),
       });
-      const data = (await res.json()) as {
-        videos?: MediaItem[];
-        continuation?: ContinuationInfo | null;
-        error?: string;
-      };
-      if (!res.ok) throw new Error(data.error || 'Failed to load more videos.');
 
       setSearchVideosList((prev) => {
         const seen = new Set(prev.map((v) => v.id));
@@ -524,13 +516,15 @@ export default function App() {
     if (!continuation || loadingMore) return;
     setLoadingMore(true);
     try {
-      const res = await fetch('/api/channel/more', {
+      const data = await safeFetchJson<{
+        items?: MediaItem[];
+        playlists?: PlaylistCard[];
+        continuation?: ContinuationInfo | null;
+      }>('/api/channel/more', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ continuation, tab: activeTab }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to load more.');
 
       if (activeTab === 'playlists') {
         setPlaylists((prev) => {
@@ -567,17 +561,15 @@ export default function App() {
     try {
       while (currentCont && !stopLoadAllRef.current && pages < MAX_PAGES) {
         pages += 1;
-        const res: Response = await fetch('/api/channel/more', {
+        const data: {
+          items?: MediaItem[];
+          playlists?: PlaylistCard[];
+          continuation?: ContinuationInfo | null;
+        } = await safeFetchJson('/api/channel/more', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ continuation: currentCont, tab: activeTab }),
         });
-        const data = (await res.json()) as {
-          items?: MediaItem[];
-          playlists?: PlaylistCard[];
-          continuation?: ContinuationInfo | null;
-        };
-        if (!res.ok) break;
 
         if (activeTab === 'playlists') {
           setPlaylists((prev) => {
@@ -607,9 +599,9 @@ export default function App() {
     setLoadingPlaylist(true);
     setError(null);
     try {
-      const res = await fetch(`/api/playlist?list=${encodeURIComponent(playlist.id)}`);
-      const data = (await res.json()) as PlaylistDetailResponse & { error?: string };
-      if (!res.ok) throw new Error(data.error || 'Could not load playlist.');
+      const data = await safeFetchJson<PlaylistDetailResponse>(
+        `/api/playlist?list=${encodeURIComponent(playlist.id)}`
+      );
       const taggedVideos = (data.videos || []).map((v) => ({
         ...v,
         channelTitle: v.channelTitle || data.author || channel?.title,
