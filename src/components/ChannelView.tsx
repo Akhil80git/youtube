@@ -17,11 +17,13 @@ import type {
   PlaylistCard,
   PlaylistDetailResponse,
 } from '../types';
+import { DesktopSplitPlayer } from './DesktopSplitPlayer';
 import { MediaCard, PlaylistCardItem } from './MediaCard';
 import { MusicTrackRow } from './MusicTrackRow';
 
 interface ChannelViewProps {
   appMode: 'videos' | 'music';
+  isDesktop: boolean;
   channel: ChannelInfo;
   activeTab: ChannelTab;
   items: MediaItem[];
@@ -32,6 +34,9 @@ interface ChannelViewProps {
   loadingMore: boolean;
   loadingAll: boolean;
   playingItem: MediaItem | null;
+  startSeconds: number;
+  hasPrev: boolean;
+  hasNext: boolean;
   hasExpandedPlayer: boolean;
   activePlaylist: PlaylistDetailResponse | null;
   loadingPlaylist: boolean;
@@ -45,8 +50,14 @@ interface ChannelViewProps {
   onStopLoadAll: () => void;
   onPlayItem: (item: MediaItem, customQueue?: MediaItem[], queueLabel?: string) => void;
   onStopPlay: () => void;
+  onPrev: () => void;
+  onNext: () => void;
   onEnded: () => void;
-  onExpandFull: (item: MediaItem, initialRotation: 0 | 90 | 180 | 270) => void;
+  onExpandFull: (
+    item: MediaItem,
+    initialRotation: 0 | 90 | 180 | 270,
+    startSeconds?: number
+  ) => void;
   onOpenPlaylist: (playlist: PlaylistCard) => void;
   onClosePlaylist: () => void;
 }
@@ -73,6 +84,7 @@ function parseViewNumber(text: string): number {
 
 export function ChannelView({
   appMode,
+  isDesktop,
   channel,
   activeTab,
   items,
@@ -83,6 +95,9 @@ export function ChannelView({
   loadingMore,
   loadingAll,
   playingItem,
+  startSeconds,
+  hasPrev,
+  hasNext,
   hasExpandedPlayer,
   activePlaylist,
   loadingPlaylist,
@@ -96,6 +111,8 @@ export function ChannelView({
   onStopLoadAll,
   onPlayItem,
   onStopPlay,
+  onPrev,
+  onNext,
   onEnded,
   onExpandFull,
   onOpenPlaylist,
@@ -122,8 +139,24 @@ export function ChannelView({
     return q ? playlists.filter((p) => p.title.toLowerCase().includes(q)) : playlists;
   }, [playlists, filterText]);
 
+  const splitPlaylistActive =
+    isDesktop &&
+    appMode === 'videos' &&
+    Boolean(playingItem) &&
+    !hasExpandedPlayer &&
+    Boolean(activePlaylist);
+
+  const splitTabActive =
+    isDesktop &&
+    appMode === 'videos' &&
+    Boolean(playingItem) &&
+    !hasExpandedPlayer &&
+    !activePlaylist &&
+    activeTab !== 'playlists' &&
+    activeTab !== 'about';
+
   return (
-    <main className="mx-auto max-w-[1360px] px-3 pb-24 pt-4 sm:px-6 sm:pt-6">
+    <main className="mx-auto max-w-[1440px] px-3 pb-24 pt-4 sm:px-6 sm:pt-6">
       {/* Channel Banner */}
       {channel.banner && !bannerError && (
         <div className="mb-4 aspect-[4/1] w-full overflow-hidden rounded-xl bg-[#EAE7E1] sm:mb-6 sm:aspect-[6/1] sm:rounded-2xl">
@@ -415,24 +448,49 @@ export function ChannelView({
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {activePlaylist.videos.map((vid) => (
-                  <MediaCard
-                    key={vid.id}
-                    item={vid}
-                    isPlaying={playingItem?.id === vid.id}
-                    suppressInlineFrame={hasExpandedPlayer}
-                    isLiked={isLiked(vid.id)}
-                    onPlay={(item) =>
-                      onPlayItem(item, activePlaylist.videos, activePlaylist.title)
+              <>
+                {splitPlaylistActive && playingItem && (
+                  <DesktopSplitPlayer
+                    playingItem={playingItem}
+                    queue={activePlaylist.videos}
+                    queueTitle={activePlaylist.title}
+                    startSeconds={startSeconds}
+                    hasPrev={hasPrev}
+                    hasNext={hasNext}
+                    isLiked={isLiked}
+                    onSelectVideo={(vid) =>
+                      onPlayItem(vid, activePlaylist.videos, activePlaylist.title)
                     }
-                    onStopPlay={onStopPlay}
+                    onPrev={onPrev}
+                    onNext={onNext}
                     onEnded={onEnded}
-                    onExpandFull={onExpandFull}
                     onToggleLike={onToggleLike}
+                    onOpenFull={(sec) => onExpandFull(playingItem, 0, sec)}
+                    onClose={onStopPlay}
                   />
-                ))}
-              </div>
+                )}
+
+                {!splitPlaylistActive && (
+                  <div className="grid grid-cols-1 gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {activePlaylist.videos.map((vid) => (
+                      <MediaCard
+                        key={vid.id}
+                        item={vid}
+                        isPlaying={playingItem?.id === vid.id}
+                        suppressInlineFrame={hasExpandedPlayer || isDesktop}
+                        isLiked={isLiked(vid.id)}
+                        onPlay={(item) =>
+                          onPlayItem(item, activePlaylist.videos, activePlaylist.title)
+                        }
+                        onStopPlay={onStopPlay}
+                        onEnded={onEnded}
+                        onExpandFull={onExpandFull}
+                        onToggleLike={onToggleLike}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         ) : filteredPlaylists.length === 0 ? (
@@ -468,6 +526,28 @@ export function ChannelView({
                 />
               ))}
             </div>
+          ) : splitTabActive && playingItem ? (
+            <div className="mt-6">
+              <DesktopSplitPlayer
+                playingItem={playingItem}
+                queue={filteredItems}
+                queueTitle={`${channel.title} · ${TAB_LABELS[activeTab]}`}
+                startSeconds={startSeconds}
+                hasPrev={hasPrev}
+                hasNext={hasNext}
+                isLiked={isLiked}
+                hasMore={hasMore}
+                loadingMore={loadingMore}
+                onLoadMore={onLoadMore}
+                onSelectVideo={(clicked) => onPlayItem(clicked, filteredItems)}
+                onPrev={onPrev}
+                onNext={onNext}
+                onEnded={onEnded}
+                onToggleLike={onToggleLike}
+                onOpenFull={(sec) => onExpandFull(playingItem, 0, sec)}
+                onClose={onStopPlay}
+              />
+            </div>
           ) : (
             <div
               className={`mt-6 grid gap-x-4 gap-y-7 sm:gap-x-5 sm:gap-y-8 ${
@@ -481,9 +561,9 @@ export function ChannelView({
                   key={item.id}
                   item={item}
                   isPlaying={playingItem?.id === item.id}
-                  suppressInlineFrame={hasExpandedPlayer}
+                  suppressInlineFrame={hasExpandedPlayer || isDesktop}
                   isLiked={isLiked(item.id)}
-                  onPlay={(clicked) => onPlayItem(clicked)}
+                  onPlay={(clicked) => onPlayItem(clicked, filteredItems)}
                   onStopPlay={onStopPlay}
                   onEnded={onEnded}
                   onExpandFull={onExpandFull}
@@ -494,7 +574,7 @@ export function ChannelView({
           )}
 
           {/* Pagination Footer */}
-          <div className="mt-10 flex flex-col gap-4 border-t border-[#E5E3DD] pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className={`mt-10 flex flex-col gap-4 border-t border-[#E5E3DD] pt-6 sm:flex-row sm:items-center sm:justify-between ${splitTabActive ? 'lg:hidden' : ''}`}>
             <p className="text-xs tabular-nums text-[#5C5A55]">
               Showing {filteredItems.length} of {items.length} loaded{' '}
               {TAB_LABELS[activeTab].toLowerCase()}

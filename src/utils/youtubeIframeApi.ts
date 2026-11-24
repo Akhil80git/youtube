@@ -1,6 +1,6 @@
 export interface YTPlayerInstance {
   loadVideoById: (
-    idOrOpts: string | { videoId: string; suggestedQuality?: string }
+    idOrOpts: string | { videoId: string; startSeconds?: number; suggestedQuality?: string }
   ) => void;
   destroy: () => void;
   playVideo: () => void;

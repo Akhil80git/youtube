@@ -1,10 +1,12 @@
 import { ArrowLeft, Compass, Loader2, Play, RefreshCw } from 'lucide-react';
 import type { MediaItem } from '../types';
+import { DesktopSplitPlayer } from './DesktopSplitPlayer';
 import { MediaCard } from './MediaCard';
 import { MusicTrackRow } from './MusicTrackRow';
 
 interface FeedViewProps {
   appMode: 'videos' | 'music';
+  isDesktop: boolean;
   items: MediaItem[];
   seeds: string[];
   activeSeed: string | null;
@@ -12,6 +14,9 @@ interface FeedViewProps {
   loading: boolean;
   error: string | null;
   playingItem: MediaItem | null;
+  startSeconds: number;
+  hasPrev: boolean;
+  hasNext: boolean;
   hasExpandedPlayer: boolean;
   hasChannelOpen: boolean;
   isLiked: (id: string) => boolean;
@@ -19,8 +24,14 @@ interface FeedViewProps {
   onRefresh: () => void;
   onPlayItem: (item: MediaItem, queue: MediaItem[]) => void;
   onStopPlay: () => void;
+  onPrev: () => void;
+  onNext: () => void;
   onEnded: () => void;
-  onExpandFull: (item: MediaItem, initialRotation: 0 | 90 | 180 | 270) => void;
+  onExpandFull: (
+    item: MediaItem,
+    initialRotation: 0 | 90 | 180 | 270,
+    startSeconds?: number
+  ) => void;
   onToggleLike: (item: MediaItem) => void;
   onOpenChannel: (path: string) => void;
   onBack: () => void;
@@ -28,6 +39,7 @@ interface FeedViewProps {
 
 export function FeedView({
   appMode,
+  isDesktop,
   items,
   seeds,
   activeSeed,
@@ -35,6 +47,9 @@ export function FeedView({
   loading,
   error,
   playingItem,
+  startSeconds,
+  hasPrev,
+  hasNext,
   hasExpandedPlayer,
   hasChannelOpen,
   isLiked,
@@ -42,14 +57,19 @@ export function FeedView({
   onRefresh,
   onPlayItem,
   onStopPlay,
+  onPrev,
+  onNext,
   onEnded,
   onExpandFull,
   onToggleLike,
   onOpenChannel,
   onBack,
 }: FeedViewProps) {
+  const splitActive =
+    isDesktop && appMode === 'videos' && Boolean(playingItem) && !hasExpandedPlayer;
+
   return (
-    <main className="mx-auto max-w-[1360px] px-3 pb-24 pt-5 sm:px-6 sm:pt-6">
+    <main className="mx-auto max-w-[1440px] px-3 pb-24 pt-5 sm:px-6 sm:pt-6">
       <div className="flex flex-col gap-4 border-b border-[#E5E3DD] pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <button
@@ -180,6 +200,26 @@ export function FeedView({
             />
           ))}
         </div>
+      ) : splitActive && playingItem ? (
+        <div className="mt-6">
+          <DesktopSplitPlayer
+            playingItem={playingItem}
+            queue={items}
+            queueTitle="For You Feed"
+            startSeconds={startSeconds}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
+            isLiked={isLiked}
+            onSelectVideo={(clicked) => onPlayItem(clicked, items)}
+            onPrev={onPrev}
+            onNext={onNext}
+            onEnded={onEnded}
+            onToggleLike={onToggleLike}
+            onOpenFull={(sec) => onExpandFull(playingItem, 0, sec)}
+            onClose={onStopPlay}
+            onOpenChannel={onOpenChannel}
+          />
+        </div>
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {items.map((item) => (
@@ -187,7 +227,7 @@ export function FeedView({
               key={item.id}
               item={item}
               isPlaying={playingItem?.id === item.id}
-              suppressInlineFrame={hasExpandedPlayer}
+              suppressInlineFrame={hasExpandedPlayer || isDesktop}
               isLiked={isLiked(item.id)}
               onPlay={(clicked) => onPlayItem(clicked, items)}
               onStopPlay={onStopPlay}

@@ -12,6 +12,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import type { MediaItem, SearchVideosResponse } from '../types';
 import { safeFetchJson } from '../utils/api';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface TopNavProps {
   query: string;
@@ -136,14 +137,14 @@ export function TopNav({
     (trimmedInput.length >= 2 || (trimmedInput.length === 0 && filteredRecent.length > 0));
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[#E5E3DD] bg-white/95 backdrop-blur-md">
-      <div className="mx-auto max-w-[1360px] px-3 sm:px-6">
+    <header className="sticky top-0 z-30 border-b border-[#E5E3DD] bg-white/95 backdrop-blur-md lg:pl-60 xl:pl-64">
+      <div className="mx-auto max-w-[1440px] px-3 sm:px-6">
         <div className="flex h-14 items-center justify-between gap-2 sm:h-16 sm:gap-4">
-          {/* Brand Logo */}
+          {/* Brand Logo (shown on mobile/tablet; laptop displays logo in vertical sidebar) */}
           <button
             type="button"
             onClick={onResetHome}
-            className={`font-display shrink-0 cursor-pointer items-center gap-1.5 text-base font-bold tracking-tight text-[#111111] transition-colors hover:text-[#E11D48] sm:text-xl whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#E11D48] ${
+            className={`font-display shrink-0 cursor-pointer items-center gap-1.5 text-base font-bold tracking-tight text-[#111111] transition-colors hover:text-[#E11D48] sm:text-xl whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#E11D48] lg:hidden ${
               searchExpanded ? 'hidden sm:inline-flex' : 'inline-flex'
             }`}
           >
@@ -157,7 +158,9 @@ export function TopNav({
           <div
             ref={containerRef}
             className={`relative transition-all duration-200 ${
-              searchExpanded ? 'flex-1 sm:max-w-xl' : 'w-28 xs:w-36 sm:w-52 md:w-64'
+              searchExpanded
+                ? 'flex-1 sm:max-w-xl lg:max-w-2xl'
+                : 'w-28 xs:w-36 sm:w-52 md:w-64 lg:w-full lg:max-w-lg'
             }`}
           >
             {!searchExpanded ? (
@@ -340,79 +343,83 @@ export function TopNav({
             )}
           </div>
 
-          {/* Right Small Icon Actions: Feed, Following, Liked */}
+          {/* Right Actions: PWA Install + Mobile Icon Actions (Feed, Following, Liked moved to LaptopSidebar on lg+) */}
           <div
             className={`shrink-0 items-center gap-1.5 sm:gap-2 ${
               searchExpanded ? 'hidden sm:flex' : 'flex'
             }`}
           >
-            <button
-              type="button"
-              onClick={onOpenFeed}
-              title="Feed (For You)"
-              aria-label="Open personalized Feed"
-              className={`relative inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border transition-colors sm:h-10 sm:w-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E11D48] ${
-                activeView === 'feed'
-                  ? 'border-[#111111] bg-[#111111] text-white'
-                  : 'border-[#E5E3DD] bg-white text-[#111111] hover:border-[#111111]'
-              }`}
-            >
-              <Compass className="h-4 w-4" />
-            </button>
+            <PWAInstallButton variant="compact" />
 
-            <button
-              type="button"
-              onClick={onOpenFollowing}
-              title={`Following (${followedCount})`}
-              aria-label={`Followed channels (${followedCount})`}
-              className={`relative inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border transition-colors sm:h-10 sm:w-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E11D48] ${
-                activeView === 'following'
-                  ? 'border-[#111111] bg-[#111111] text-white'
-                  : 'border-[#E5E3DD] bg-white text-[#111111] hover:border-[#111111]'
-              }`}
-            >
-              <Users className="h-4 w-4" />
-              {followedCount > 0 && (
-                <span
-                  className={`absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 font-mono text-[10px] font-semibold leading-none tabular-nums ${
-                    activeView === 'following'
-                      ? 'bg-[#E11D48] text-white'
-                      : 'bg-[#111111] text-white'
-                  }`}
-                >
-                  {followedCount > 99 ? '99+' : followedCount}
-                </span>
-              )}
-            </button>
+            <div className="flex items-center gap-1.5 sm:gap-2 lg:hidden">
+              <button
+                type="button"
+                onClick={onOpenFeed}
+                title="Feed (For You)"
+                aria-label="Open personalized Feed"
+                className={`relative inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border transition-colors sm:h-10 sm:w-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E11D48] ${
+                  activeView === 'feed'
+                    ? 'border-[#111111] bg-[#111111] text-white'
+                    : 'border-[#E5E3DD] bg-white text-[#111111] hover:border-[#111111]'
+                }`}
+              >
+                <Compass className="h-4 w-4" />
+              </button>
 
-            <button
-              type="button"
-              onClick={onOpenLiked}
-              title={`Liked (${likedCount})`}
-              aria-label={`Open Liked Playlist (${likedCount} items)`}
-              className={`relative inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border transition-colors sm:h-10 sm:w-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E11D48] ${
-                activeView === 'liked'
-                  ? 'border-[#E11D48] bg-[#E11D48] text-white'
-                  : 'border-[#E5E3DD] bg-white text-[#111111] hover:border-[#111111]'
-              }`}
-            >
-              <Heart
-                className={`h-4 w-4 ${
-                  activeView === 'liked' || likedCount > 0 ? 'fill-current' : ''
-                } ${activeView !== 'liked' && likedCount > 0 ? 'text-[#E11D48]' : ''}`}
-              />
-              {likedCount > 0 && (
-                <span
-                  className={`absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 font-mono text-[10px] font-semibold leading-none tabular-nums ${
-                    activeView === 'liked'
-                      ? 'bg-[#111111] text-white'
-                      : 'bg-[#E11D48] text-white'
-                  }`}
-                >
-                  {likedCount > 99 ? '99+' : likedCount}
-                </span>
-              )}
-            </button>
+              <button
+                type="button"
+                onClick={onOpenFollowing}
+                title={`Following (${followedCount})`}
+                aria-label={`Followed channels (${followedCount})`}
+                className={`relative inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border transition-colors sm:h-10 sm:w-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E11D48] ${
+                  activeView === 'following'
+                    ? 'border-[#111111] bg-[#111111] text-white'
+                    : 'border-[#E5E3DD] bg-white text-[#111111] hover:border-[#111111]'
+                }`}
+              >
+                <Users className="h-4 w-4" />
+                {followedCount > 0 && (
+                  <span
+                    className={`absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 font-mono text-[10px] font-semibold leading-none tabular-nums ${
+                      activeView === 'following'
+                        ? 'bg-[#E11D48] text-white'
+                        : 'bg-[#111111] text-white'
+                    }`}
+                  >
+                    {followedCount > 99 ? '99+' : followedCount}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={onOpenLiked}
+                title={`Liked (${likedCount})`}
+                aria-label={`Open Liked Playlist (${likedCount} items)`}
+                className={`relative inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border transition-colors sm:h-10 sm:w-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E11D48] ${
+                  activeView === 'liked'
+                    ? 'border-[#E11D48] bg-[#E11D48] text-white'
+                    : 'border-[#E5E3DD] bg-white text-[#111111] hover:border-[#111111]'
+                }`}
+              >
+                <Heart
+                  className={`h-4 w-4 ${
+                    activeView === 'liked' || likedCount > 0 ? 'fill-current' : ''
+                  } ${activeView !== 'liked' && likedCount > 0 ? 'text-[#E11D48]' : ''}`}
+                />
+                {likedCount > 0 && (
+                  <span
+                    className={`absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 font-mono text-[10px] font-semibold leading-none tabular-nums ${
+                      activeView === 'liked'
+                        ? 'bg-[#111111] text-white'
+                        : 'bg-[#E11D48] text-white'
+                    }`}
+                  >
+                    {likedCount > 99 ? '99+' : likedCount}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
