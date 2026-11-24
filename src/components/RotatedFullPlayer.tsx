@@ -18,6 +18,7 @@ interface RotatedFullPlayerProps {
   initialLocked?: boolean;
   onSaveKidsPin?: (pin: string) => void;
   onSwitchHalf?: (currentSeconds: number) => void;
+  onLockChange?: (locked: boolean) => void;
   onEnded: () => void;
   onClose: () => void;
 }
@@ -33,6 +34,7 @@ export function RotatedFullPlayer({
   initialLocked = false,
   onSaveKidsPin,
   onSwitchHalf,
+  onLockChange,
   onEnded,
   onClose,
 }: RotatedFullPlayerProps) {
@@ -55,6 +57,11 @@ export function RotatedFullPlayer({
   useEffect(() => {
     setLocalKidsPin(kidsPin);
   }, [kidsPin]);
+
+  useEffect(() => {
+    onLockChange?.(isLocked);
+    return () => onLockChange?.(false);
+  }, [isLocked, onLockChange]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {

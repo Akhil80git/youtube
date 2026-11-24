@@ -175,9 +175,13 @@ export function MediaCard({
   return (
     <div className="group relative flex w-full flex-col">
       <div
-        className={`relative w-full overflow-hidden rounded-xl bg-[#EAE7E1] ${
+        className={`relative w-full overflow-hidden rounded-xl bg-[#EAE7E1] dark:bg-[#1E1E24] ${
           isShort ? 'aspect-[9/16]' : 'aspect-video'
-        } ${isPlaying ? 'ring-2 ring-[#E11D48] ring-offset-2 ring-offset-[#FAF9F7]' : ''}`}
+        } ${
+          isPlaying
+            ? 'ring-2 ring-[#E11D48] ring-offset-2 ring-offset-[#FAF9F7] dark:ring-offset-[#0B0B0D]'
+            : ''
+        }`}
       >
         {isPlaying && !suppressInlineFrame && isValidVideoId(item.id) ? (
           <InlineCardPlayer
@@ -204,14 +208,14 @@ export function MediaCard({
                   className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
                 />
               ) : (
-                <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-[#232220] to-[#111111] p-4 text-center text-white/80">
-                  <Play className="mb-2 h-7 w-7 text-white/70" />
+                <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-[#F2F0EC] to-[#EAE7E1] p-4 text-center text-[#5C5A55] dark:from-[#232220] dark:to-[#141418] dark:text-white/80">
+                  <Play className="mb-2 h-7 w-7 text-[#E11D48]" />
                   <span className="line-clamp-2 text-xs font-medium">{item.title}</span>
                 </div>
               )}
 
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition-colors duration-150 group-hover:bg-black/25">
-                <div className="flex h-11 w-11 scale-90 items-center justify-center rounded-full bg-[#111111]/85 text-white opacity-0 shadow-md transition-all duration-150 group-hover:scale-100 group-hover:opacity-100">
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition-colors duration-150 group-hover:bg-black/20">
+                <div className="flex h-11 w-11 scale-90 items-center justify-center rounded-full bg-[#E11D48]/95 text-white opacity-0 shadow-md transition-all duration-150 group-hover:scale-100 group-hover:opacity-100">
                   <Play className="h-4 w-4 translate-x-0.5 fill-current" />
                 </div>
               </div>
@@ -222,8 +226,10 @@ export function MediaCard({
                 </span>
               ) : item.duration ? (
                 <span
-                  className={`absolute bottom-2 right-2 rounded px-1.5 py-0.5 font-mono text-[11px] font-medium tabular-nums text-white ${
-                    item.isLiveNow ? 'bg-[#E11D48]' : 'bg-black/80'
+                  className={`absolute bottom-2 right-2 rounded px-1.5 py-0.5 font-mono text-[11px] font-medium tabular-nums ${
+                    item.isLiveNow
+                      ? 'bg-[#E11D48] text-white'
+                      : 'bg-white/90 text-[#111111] shadow-xs dark:bg-black/80 dark:text-white'
                   }`}
                 >
                   {item.duration}
@@ -242,7 +248,7 @@ export function MediaCard({
               className={`absolute right-2 top-2 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full backdrop-blur-sm transition-all duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E11D48] ${
                 isLiked
                   ? 'bg-[#E11D48] text-white opacity-100 shadow-md'
-                  : 'bg-black/60 text-white opacity-90 hover:bg-black/85 sm:opacity-0 sm:group-hover:opacity-100'
+                  : 'bg-white/85 text-[#111111] opacity-90 shadow-xs hover:bg-white sm:opacity-0 sm:group-hover:opacity-100 dark:bg-black/60 dark:text-white dark:hover:bg-black/85'
               }`}
             >
               <Heart className={`h-4 w-4 ${isLiked ? 'fill-current' : ''}`} />
@@ -253,7 +259,7 @@ export function MediaCard({
 
       {/* Inline controls when this card is playing */}
       {isPlaying && (
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5 rounded-lg border border-[#E5E3DD] bg-white px-2.5 py-1.5">
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5 rounded-lg border border-[#E5E3DD] bg-white px-2.5 py-1.5 dark:border-[#27272F] dark:bg-[#141418]">
           <div className="flex items-center gap-1">
             <button
               type="button"
@@ -261,8 +267,8 @@ export function MediaCard({
               title="Hard Rotate Video"
               className={`inline-flex lg:hidden h-8 cursor-pointer items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors ${
                 rotation !== 0
-                  ? 'bg-[#111111] text-white'
-                  : 'bg-[#FAF9F7] text-[#111111] hover:bg-[#EAE7E1]'
+                  ? 'bg-[#E11D48] text-white'
+                  : 'bg-[#FAF9F7] text-[#111111] hover:bg-[#EAE7E1] dark:bg-[#1E1E24] dark:text-[#F4F4F6] dark:hover:bg-[#27272F]'
               }`}
             >
               <RotateCw className="h-3.5 w-3.5" />
@@ -273,7 +279,7 @@ export function MediaCard({
               type="button"
               onClick={() => onExpandFull(item, rotation)}
               title="Full View"
-              className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-md bg-[#FAF9F7] px-2 text-xs font-medium text-[#111111] hover:bg-[#EAE7E1]"
+              className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-md bg-[#FAF9F7] px-2 text-xs font-medium text-[#111111] hover:bg-[#EAE7E1] dark:bg-[#1E1E24] dark:text-[#F4F4F6] dark:hover:bg-[#27272F]"
             >
               <Maximize2 className="h-3.5 w-3.5" />
               <span>Full</span>
@@ -286,7 +292,9 @@ export function MediaCard({
               onClick={() => onToggleLike(item)}
               aria-label={isLiked ? 'Unlike' : 'Like'}
               className={`inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md transition-colors ${
-                isLiked ? 'bg-[#E11D48] text-white' : 'bg-[#FAF9F7] text-[#5C5A55] hover:text-[#111111]'
+                isLiked
+                  ? 'bg-[#E11D48] text-white'
+                  : 'bg-[#FAF9F7] text-[#5C5A55] hover:text-[#111111] dark:bg-[#1E1E24] dark:text-[#A1A1AA] dark:hover:text-white'
               }`}
             >
               <Heart className={`h-3.5 w-3.5 ${isLiked ? 'fill-current' : ''}`} />
@@ -296,7 +304,7 @@ export function MediaCard({
               type="button"
               onClick={onStopPlay}
               aria-label="Stop video"
-              className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md bg-[#FAF9F7] text-[#5C5A55] hover:bg-[#111111] hover:text-white"
+              className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md bg-[#FAF9F7] text-[#5C5A55] hover:bg-[#E11D48] hover:text-white dark:bg-[#1E1E24] dark:text-[#A1A1AA]"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -310,11 +318,11 @@ export function MediaCard({
           onClick={() => (isPlaying ? onExpandFull(item, rotation) : onPlay(item))}
           className="min-w-0 flex-1 cursor-pointer text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E11D48]"
         >
-          <h3 className="line-clamp-2 text-[14px] font-semibold leading-snug text-[#111111] transition-colors group-hover:text-[#E11D48]">
+          <h3 className="line-clamp-2 text-[14px] font-semibold leading-snug text-[#111111] transition-colors group-hover:text-[#E11D48] dark:text-[#F4F4F6]">
             {item.title}
           </h3>
           {(item.channelTitle || item.viewsText || item.publishedText) && (
-            <p className="mt-1 truncate text-[12px] tabular-nums text-[#5C5A55]">
+            <p className="mt-1 truncate text-[12px] tabular-nums text-[#5C5A55] dark:text-[#A1A1AA]">
               {item.channelTitle && item.channelPath && onOpenChannel ? (
                 <>
                   <span
@@ -331,7 +339,7 @@ export function MediaCard({
                         onOpenChannel(item.channelPath!);
                       }
                     }}
-                    className="font-medium text-[#111111] hover:text-[#E11D48] hover:underline"
+                    className="font-medium text-[#111111] hover:text-[#E11D48] hover:underline dark:text-[#F4F4F6]"
                   >
                     {item.channelTitle}
                   </span>
@@ -356,7 +364,9 @@ export function MediaCard({
             aria-label={isLiked ? 'Unlike' : 'Like'}
             aria-pressed={isLiked}
             className={`flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors sm:hidden ${
-              isLiked ? 'text-[#E11D48]' : 'text-[#73716C] hover:text-[#111111]'
+              isLiked
+                ? 'text-[#E11D48]'
+                : 'text-[#73716C] hover:text-[#111111] dark:text-[#A1A1AA] dark:hover:text-white'
             }`}
           >
             <Heart className={`h-4 w-4 ${isLiked ? 'fill-current' : ''}`} />
@@ -381,7 +391,7 @@ export function PlaylistCardItem({ playlist, onSelect }: PlaylistCardItemProps) 
       onClick={() => onSelect(playlist)}
       className="group flex w-full cursor-pointer flex-col text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#E11D48]"
     >
-      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-[#EAE7E1]">
+      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-[#EAE7E1] dark:bg-[#1E1E24]">
         {!imgError && playlist.thumbnail ? (
           <img
             src={playlist.thumbnail}
@@ -392,13 +402,13 @@ export function PlaylistCardItem({ playlist, onSelect }: PlaylistCardItemProps) 
             className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-[#232220] text-white/70">
+          <div className="flex h-full w-full items-center justify-center bg-[#F2F0EC] text-[#5C5A55] dark:bg-[#232220] dark:text-white/70">
             <ListVideo className="h-8 w-8" />
           </div>
         )}
 
-        <div className="absolute inset-y-0 right-0 flex w-2/5 flex-col items-center justify-center bg-black/70 px-2 text-center text-white backdrop-blur-[2px]">
-          <ListVideo className="mb-1 h-5 w-5" />
+        <div className="absolute inset-y-0 right-0 flex w-2/5 flex-col items-center justify-center bg-white/85 px-2 text-center text-[#111111] backdrop-blur-[2px] dark:bg-black/70 dark:text-white">
+          <ListVideo className="mb-1 h-5 w-5 text-[#E11D48]" />
           <span className="font-mono text-xs font-medium tabular-nums">
             {playlist.videoCountText}
           </span>
@@ -406,11 +416,13 @@ export function PlaylistCardItem({ playlist, onSelect }: PlaylistCardItemProps) 
       </div>
 
       <div className="mt-2.5 space-y-1">
-        <h3 className="line-clamp-2 text-[14px] font-semibold leading-snug text-[#111111] transition-colors group-hover:text-[#E11D48]">
+        <h3 className="line-clamp-2 text-[14px] font-semibold leading-snug text-[#111111] transition-colors group-hover:text-[#E11D48] dark:text-[#F4F4F6]">
           {playlist.title}
         </h3>
         {playlist.updatedText && (
-          <p className="truncate text-[12px] text-[#5C5A55]">{playlist.updatedText}</p>
+          <p className="truncate text-[12px] text-[#5C5A55] dark:text-[#A1A1AA]">
+            {playlist.updatedText}
+          </p>
         )}
       </div>
     </button>

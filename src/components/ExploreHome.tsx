@@ -64,17 +64,17 @@ export function ExploreHome({
         <div
           role="tablist"
           aria-label="Playback mode"
-          className="inline-flex rounded-xl border border-[#E5E3DD] bg-[#F2F0EC] p-1"
+          className="inline-flex rounded-xl border border-[#E5E3DD] bg-[#F2F0EC] p-1 dark:border-[#27272F] dark:bg-[#141418]"
         >
           <button
             type="button"
             role="tab"
             aria-selected={appMode === 'videos'}
             onClick={() => onChangeMode('videos')}
-            className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors whitespace-nowrap ${
+            className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors whitespace-nowrap ${
               appMode === 'videos'
-                ? 'bg-[#111111] text-white shadow-xs'
-                : 'text-[#5C5A55] hover:text-[#111111]'
+                ? 'bg-white text-[#E11D48] shadow-xs dark:bg-[#27272F] dark:text-white'
+                : 'text-[#5C5A55] hover:text-[#111111] dark:text-[#A1A1AA] dark:hover:text-white'
             }`}
           >
             <Film className="h-4 w-4" />
@@ -86,10 +86,10 @@ export function ExploreHome({
             role="tab"
             aria-selected={appMode === 'music'}
             onClick={() => onChangeMode('music')}
-            className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors whitespace-nowrap ${
+            className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors whitespace-nowrap ${
               appMode === 'music'
                 ? 'bg-[#E11D48] text-white shadow-xs'
-                : 'text-[#5C5A55] hover:text-[#111111]'
+                : 'text-[#5C5A55] hover:text-[#111111] dark:text-[#A1A1AA] dark:hover:text-white'
             }`}
           >
             <Music className="h-4 w-4" />
@@ -97,18 +97,18 @@ export function ExploreHome({
           </button>
         </div>
 
-        <span className="hidden text-xs text-[#73716C] sm:inline">
+        <span className="hidden text-xs text-[#73716C] sm:inline dark:text-[#A1A1AA]">
           {appMode === 'music' ? 'Audio-only low-data mode' : 'Full video playback mode'}
         </span>
       </div>
 
       <div className="max-w-2xl">
-        <h1 className="font-display text-3xl font-bold tracking-tight text-[#111111] sm:text-5xl [text-wrap:balance]">
+        <h1 className="font-display text-3xl font-bold tracking-tight text-[#111111] sm:text-5xl [text-wrap:balance] dark:text-[#F4F4F6]">
           {appMode === 'music'
             ? 'Pure music from any channel, zero video data.'
             : 'Any channel, all videos, zero clutter.'}
         </h1>
-        <p className="mt-3 text-sm leading-relaxed text-[#5C5A55] sm:mt-4 sm:text-lg">
+        <p className="mt-3 text-sm leading-relaxed text-[#5C5A55] sm:mt-4 sm:text-lg dark:text-[#A1A1AA]">
           {appMode === 'music'
             ? 'Search any music channel or artist, listen to audio-only tracks with minimal data usage, and queue your liked songs continuously.'
             : 'Enter any YouTube channel handle, URL, or name. Follow your favorite channels, like tracks to build an auto-playing playlist, and watch right here — free, with no API keys.'}
@@ -118,7 +118,7 @@ export function ExploreHome({
       <form onSubmit={handleSubmit} className="mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row">
         <div className="relative flex-1">
           <Search
-            className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#73716C]"
+            className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#73716C] dark:text-[#A1A1AA]"
             aria-hidden="true"
           />
           <input
@@ -131,13 +131,13 @@ export function ExploreHome({
                 : 'Try @LofiGirl, @tseries, or youtube.com/@Fireship...'
             }
             aria-label="Enter YouTube channel"
-            className="h-12 w-full rounded-xl border border-[#D8D5CE] bg-white pl-11 pr-4 text-sm text-[#111111] placeholder:text-[#73716C] transition-colors focus:border-[#111111] focus:outline-none sm:text-base"
+            className="h-12 w-full rounded-xl border border-[#D8D5CE] bg-white pl-11 pr-4 text-sm text-[#111111] placeholder:text-[#73716C] transition-colors focus:border-[#E11D48] focus:outline-none sm:text-base dark:border-[#27272F] dark:bg-[#141418] dark:text-[#F4F4F6] dark:placeholder:text-[#71717A]"
           />
         </div>
         <button
           type="submit"
           disabled={loading || !heroInput.trim()}
-          className="inline-flex h-12 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#111111] px-6 text-sm font-medium text-white transition-colors hover:bg-[#E11D48] disabled:cursor-not-allowed disabled:opacity-45 whitespace-nowrap"
+          className="inline-flex h-12 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#E11D48] px-6 text-sm font-semibold text-white transition-colors hover:bg-[#BE123C] disabled:cursor-not-allowed disabled:opacity-45 whitespace-nowrap"
         >
           <span>{loading ? 'Loading...' : 'Open Channel'}</span>
           <ArrowRight className="h-4 w-4" />
@@ -147,7 +147,7 @@ export function ExploreHome({
       {error && (
         <div
           role="alert"
-          className="mt-4 rounded-xl border border-[#E11D48]/30 bg-[#E11D48]/5 px-4 py-3 text-sm text-[#BE123C]"
+          className="mt-4 rounded-xl border border-[#E11D48]/30 bg-[#E11D48]/5 px-4 py-3 text-sm text-[#BE123C] dark:text-[#FB7185]"
         >
           {error}
         </div>
@@ -157,16 +157,16 @@ export function ExploreHome({
       {(likedItems.length > 0 || followedChannels.length > 0) && (
         <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-2">
           {likedItems.length > 0 && (
-            <section className="flex flex-col justify-between gap-4 rounded-2xl border border-[#E5E3DD] bg-white p-4 sm:p-5">
+            <section className="flex flex-col justify-between gap-4 rounded-2xl border border-[#E5E3DD] bg-white p-4 sm:p-5 dark:border-[#27272F] dark:bg-[#141418]">
               <div className="flex items-center gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#E11D48]/10 text-[#E11D48]">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF1F3] text-[#E11D48] dark:bg-[#E11D48]/20">
                   <Heart className="h-5 w-5 fill-current" />
                 </div>
                 <div>
-                  <h2 className="font-display text-base font-bold text-[#111111]">
+                  <h2 className="font-display text-base font-bold text-[#111111] dark:text-[#F4F4F6]">
                     Your Liked Playlist
                   </h2>
-                  <p className="text-xs tabular-nums text-[#5C5A55]">
+                  <p className="text-xs tabular-nums text-[#5C5A55] dark:text-[#A1A1AA]">
                     {likedItems.length} {likedItems.length === 1 ? 'track' : 'tracks'} · Ready
                     for continuous auto-play
                   </p>
@@ -177,7 +177,7 @@ export function ExploreHome({
                 <button
                   type="button"
                   onClick={onPlayLikedAll}
-                  className="inline-flex h-10 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#E11D48] px-4 text-xs font-medium text-white transition-colors hover:bg-[#BE123C] whitespace-nowrap"
+                  className="inline-flex h-10 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#E11D48] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#BE123C] whitespace-nowrap"
                 >
                   <Play className="h-3.5 w-3.5 fill-current" />
                   <span>Play All</span>
@@ -185,7 +185,7 @@ export function ExploreHome({
                 <button
                   type="button"
                   onClick={onOpenLiked}
-                  className="inline-flex h-10 flex-1 cursor-pointer items-center justify-center rounded-lg border border-[#E5E3DD] bg-white px-4 text-xs font-medium text-[#111111] transition-colors hover:border-[#111111] whitespace-nowrap"
+                  className="inline-flex h-10 flex-1 cursor-pointer items-center justify-center rounded-lg border border-[#E5E3DD] bg-white px-4 text-xs font-medium text-[#111111] transition-colors hover:border-[#E11D48] hover:text-[#E11D48] whitespace-nowrap dark:border-[#27272F] dark:bg-[#1E1E24] dark:text-[#F4F4F6]"
                 >
                   Open Playlist
                 </button>
@@ -194,16 +194,16 @@ export function ExploreHome({
           )}
 
           {followedChannels.length > 0 && (
-            <section className="flex flex-col justify-between gap-4 rounded-2xl border border-[#E5E3DD] bg-white p-4 sm:p-5">
+            <section className="flex flex-col justify-between gap-4 rounded-2xl border border-[#E5E3DD] bg-white p-4 sm:p-5 dark:border-[#27272F] dark:bg-[#141418]">
               <div className="flex items-center gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#111111] text-white">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF1F3] text-[#E11D48] dark:bg-[#27272F] dark:text-white">
                   <Users className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="font-display text-base font-bold text-[#111111]">
+                  <h2 className="font-display text-base font-bold text-[#111111] dark:text-[#F4F4F6]">
                     Followed Channels
                   </h2>
-                  <p className="text-xs tabular-nums text-[#5C5A55]">
+                  <p className="text-xs tabular-nums text-[#5C5A55] dark:text-[#A1A1AA]">
                     {followedChannels.length}{' '}
                     {followedChannels.length === 1 ? 'channel' : 'channels'} saved
                   </p>
@@ -213,7 +213,7 @@ export function ExploreHome({
               <button
                 type="button"
                 onClick={onOpenFollowing}
-                className="inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#111111] px-4 text-xs font-medium text-white transition-colors hover:bg-[#E11D48] whitespace-nowrap"
+                className="inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#E5E3DD] bg-[#FAF9F7] px-4 text-xs font-semibold text-[#111111] transition-colors hover:border-[#E11D48] hover:text-[#E11D48] whitespace-nowrap dark:border-[#27272F] dark:bg-[#1E1E24] dark:text-[#F4F4F6]"
               >
                 <span>View Followed Channels</span>
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -224,13 +224,15 @@ export function ExploreHome({
       )}
 
       {followedChannels.length > 0 && (
-        <section className="mt-10 border-t border-[#E5E3DD] pt-7 sm:mt-12 sm:pt-8">
+        <section className="mt-10 border-t border-[#E5E3DD] pt-7 sm:mt-12 sm:pt-8 dark:border-[#27272F]">
           <div className="flex items-center justify-between">
-            <h2 className="font-display text-sm font-semibold text-[#111111]">Following</h2>
+            <h2 className="font-display text-sm font-semibold text-[#111111] dark:text-[#F4F4F6]">
+              Following
+            </h2>
             <button
               type="button"
               onClick={onOpenFollowing}
-              className="cursor-pointer text-xs font-medium text-[#5C5A55] hover:text-[#111111]"
+              className="cursor-pointer text-xs font-medium text-[#5C5A55] hover:text-[#E11D48] dark:text-[#A1A1AA]"
             >
               See all
             </button>
@@ -241,23 +243,27 @@ export function ExploreHome({
                 key={ch.id}
                 type="button"
                 onClick={() => onSubmitChannel(ch.path)}
-                className="flex min-h-[60px] cursor-pointer items-center gap-3 rounded-xl border border-[#E5E3DD] bg-white p-3.5 text-left transition-colors hover:border-[#111111]"
+                className="flex min-h-[60px] cursor-pointer items-center gap-3 rounded-xl border border-[#E5E3DD] bg-white p-3.5 text-left transition-colors hover:border-[#E11D48] dark:border-[#27272F] dark:bg-[#141418]"
               >
                 {ch.avatar ? (
                   <img
                     src={ch.avatar}
                     alt=""
                     referrerPolicy="no-referrer"
-                    className="h-10 w-10 shrink-0 rounded-full bg-[#F2F0EC] object-cover"
+                    className="h-10 w-10 shrink-0 rounded-full bg-[#F2F0EC] object-cover dark:bg-[#1E1E24]"
                   />
                 ) : (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#111111] font-display text-sm font-bold text-white">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFE4E8] font-display text-sm font-bold text-[#BE123C] dark:bg-[#27272F] dark:text-white">
                     {ch.title.charAt(0).toUpperCase()}
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-[#111111]">{ch.title}</div>
-                  <div className="truncate text-xs text-[#73716C]">{ch.handle}</div>
+                  <div className="truncate text-sm font-semibold text-[#111111] dark:text-[#F4F4F6]">
+                    {ch.title}
+                  </div>
+                  <div className="truncate text-xs text-[#73716C] dark:text-[#A1A1AA]">
+                    {ch.handle}
+                  </div>
                 </div>
               </button>
             ))}
@@ -266,31 +272,37 @@ export function ExploreHome({
       )}
 
       {recentChannels.length > 0 && (
-        <section className="mt-10 border-t border-[#E5E3DD] pt-7 sm:mt-12 sm:pt-8">
-          <h2 className="font-display text-sm font-semibold text-[#111111]">Recently Viewed</h2>
+        <section className="mt-10 border-t border-[#E5E3DD] pt-7 sm:mt-12 sm:pt-8 dark:border-[#27272F]">
+          <h2 className="font-display text-sm font-semibold text-[#111111] dark:text-[#F4F4F6]">
+            Recently Viewed
+          </h2>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
             {recentChannels.slice(0, 6).map((ch) => (
               <button
                 key={ch.path}
                 type="button"
                 onClick={() => onSubmitChannel(ch.path)}
-                className="flex min-h-[60px] cursor-pointer items-center gap-3 rounded-xl border border-[#E5E3DD] bg-white p-3.5 text-left transition-colors hover:border-[#111111]"
+                className="flex min-h-[60px] cursor-pointer items-center gap-3 rounded-xl border border-[#E5E3DD] bg-white p-3.5 text-left transition-colors hover:border-[#E11D48] dark:border-[#27272F] dark:bg-[#141418]"
               >
                 {ch.avatar ? (
                   <img
                     src={ch.avatar}
                     alt=""
                     referrerPolicy="no-referrer"
-                    className="h-10 w-10 shrink-0 rounded-full bg-[#F2F0EC] object-cover"
+                    className="h-10 w-10 shrink-0 rounded-full bg-[#F2F0EC] object-cover dark:bg-[#1E1E24]"
                   />
                 ) : (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#111111] font-display text-sm font-bold text-white">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFE4E8] font-display text-sm font-bold text-[#BE123C] dark:bg-[#27272F] dark:text-white">
                     {ch.title.charAt(0).toUpperCase()}
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-[#111111]">{ch.title}</div>
-                  <div className="truncate text-xs text-[#73716C]">{ch.handle}</div>
+                  <div className="truncate text-sm font-semibold text-[#111111] dark:text-[#F4F4F6]">
+                    {ch.title}
+                  </div>
+                  <div className="truncate text-xs text-[#73716C] dark:text-[#A1A1AA]">
+                    {ch.handle}
+                  </div>
                 </div>
               </button>
             ))}
@@ -298,8 +310,8 @@ export function ExploreHome({
         </section>
       )}
 
-      <section className="mt-10 border-t border-[#E5E3DD] pt-7 sm:mt-12 sm:pt-8">
-        <h2 className="font-display text-sm font-semibold text-[#111111]">
+      <section className="mt-10 border-t border-[#E5E3DD] pt-7 sm:mt-12 sm:pt-8 dark:border-[#27272F]">
+        <h2 className="font-display text-sm font-semibold text-[#111111] dark:text-[#F4F4F6]">
           {appMode === 'music' ? 'Music Channels' : 'Quick Start Channels'}
         </h2>
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
@@ -308,17 +320,17 @@ export function ExploreHome({
               key={ch.handle}
               type="button"
               onClick={() => onSubmitChannel(ch.handle)}
-              className="group flex min-h-[60px] cursor-pointer items-center justify-between rounded-xl border border-[#E5E3DD] bg-white px-4 py-3.5 text-left transition-colors hover:border-[#111111]"
+              className="group flex min-h-[60px] cursor-pointer items-center justify-between rounded-xl border border-[#E5E3DD] bg-white px-4 py-3.5 text-left transition-colors hover:border-[#E11D48] dark:border-[#27272F] dark:bg-[#141418]"
             >
               <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-[#111111] group-hover:text-[#E11D48]">
+                <div className="truncate text-sm font-semibold text-[#111111] group-hover:text-[#E11D48] dark:text-[#F4F4F6]">
                   {ch.name}
                 </div>
-                <div className="mt-0.5 truncate text-xs text-[#73716C]">
+                <div className="mt-0.5 truncate text-xs text-[#73716C] dark:text-[#A1A1AA]">
                   {ch.handle} · {ch.note}
                 </div>
               </div>
-              <ArrowRight className="h-4 w-4 shrink-0 text-[#73716C] transition-transform group-hover:translate-x-0.5 group-hover:text-[#111111]" />
+              <ArrowRight className="h-4 w-4 shrink-0 text-[#73716C] transition-transform group-hover:translate-x-0.5 group-hover:text-[#E11D48] dark:text-[#A1A1AA]" />
             </button>
           ))}
         </div>
