@@ -29,7 +29,7 @@ export function FollowingView({
   }, [followedChannels, filterText]);
 
   return (
-    <main className="mx-auto max-w-[1360px] px-3 pb-16 pt-5 sm:px-6 sm:pt-6">
+    <main className="mx-auto max-w-[1440px] px-3 pb-16 pt-5 sm:px-6 sm:pt-6">
       <div className="flex flex-col gap-4 border-b border-[#E5E3DD] pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <button

@@ -3,8 +3,10 @@ import { ChannelView } from './components/ChannelView';
 import { ExploreHome } from './components/ExploreHome';
 import { FeedView } from './components/FeedView';
 import { FollowingView } from './components/FollowingView';
+import { LaptopSidebar } from './components/LaptopSidebar';
 import { LikedPlaylistView } from './components/LikedPlaylistView';
 import { MusicPlayerBar } from './components/MusicPlayerBar';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import { RotatedFullPlayer } from './components/RotatedFullPlayer';
 import { SearchResultsView } from './components/SearchResultsView';
 import { TopNav } from './components/TopNav';
@@ -129,10 +131,24 @@ export default function App() {
   const [playingItem, setPlayingItem] = useState<MediaItem | null>(null);
   const [playerQueue, setPlayerQueue] = useState<MediaItem[]>([]);
   const [playingLikedQueue, setPlayingLikedQueue] = useState(false);
+  const [playerStartSeconds, setPlayerStartSeconds] = useState(0);
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)').matches : false
+  );
   const [expandedPlayer, setExpandedPlayer] = useState<{
     item: MediaItem;
     initialRotation: 0 | 90 | 180 | 270;
+    startSeconds?: number;
   } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = () => setIsDesktop(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   const [autoPlayNext, setAutoPlayNext] = useState(true);
   const [loopQueue, setLoopQueue] = useState(false);
@@ -614,9 +630,10 @@ export default function App() {
     }
   }
 
-  // Zero scroll jump! Plays right inside the clicked card.
+  // Zero scroll jump! Plays right inside clicked card on mobile or Half-Screen Split on laptop.
   function handlePlayItem(item: MediaItem, customQueue?: MediaItem[]) {
     setPlayingLikedQueue(false);
+    setPlayerStartSeconds(0);
     setPlayingItem(item);
     setPlayerQueue(customQueue || items);
     recordWatch(item);
@@ -627,6 +644,7 @@ export default function App() {
     setAutoPlayNext(true);
     setLoopQueue(true);
     setShuffleQueue(shuffle);
+    setPlayerStartSeconds(0);
     setPlayingItem(item);
     setPlayerQueue(likedItems);
     recordWatch(item);
@@ -655,10 +673,13 @@ export default function App() {
       }
 
       if (nextItem) {
+        setPlayerStartSeconds(0);
         setPlayingItem(nextItem);
         recordWatch(nextItem);
         if (expandedPlayer) {
-          setExpandedPlayer((prev) => (prev ? { ...prev, item: nextItem! } : null));
+          setExpandedPlayer((prev) =>
+            prev ? { ...prev, item: nextItem!, startSeconds: 0 } : null
+          );
         }
       }
     },
@@ -678,10 +699,13 @@ export default function App() {
     if (!hasPrev) return;
     const prevItem = activeQueue[currentIndex - 1];
     if (prevItem) {
+      setPlayerStartSeconds(0);
       setPlayingItem(prevItem);
       recordWatch(prevItem);
       if (expandedPlayer) {
-        setExpandedPlayer((prev) => (prev ? { ...prev, item: prevItem } : null));
+        setExpandedPlayer((prev) =>
+          prev ? { ...prev, item: prevItem, startSeconds: 0 } : null
+        );
       }
     }
   }, [hasPrev, activeQueue, currentIndex, expandedPlayer, recordWatch]);
@@ -716,6 +740,26 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#FAF9F7] text-[#111111]">
+      <LaptopSidebar
+        appMode={appMode}
+        activeView={viewMode}
+        likedCount={likedItems.length}
+        followedChannels={followedChannels}
+        activeChannelPath={channel?.path}
+        onResetHome={handleResetHome}
+        onOpenFeed={openFeedView}
+        onOpenFollowing={() => {
+          setViewMode('following');
+          window.history.replaceState(null, '', '#following');
+        }}
+        onOpenLiked={() => {
+          setViewMode('liked');
+          window.history.replaceState(null, '', '#liked');
+        }}
+        onChangeMode={handleChangeMode}
+        onOpenChannel={(path) => fetchChannel(path, 'videos', false)}
+      />
+
       <TopNav
         query={query}
         loading={loadingChannel || loadingSearch}
@@ -749,6 +793,15 @@ export default function App() {
         <RotatedFullPlayer
           current={expandedPlayer.item}
           initialRotation={expandedPlayer.initialRotation}
+          startSeconds={expandedPlayer.startSeconds ?? 0}
+          onSwitchHalf={
+            isDesktop
+              ? (sec) => {
+                  setPlayerStartSeconds(sec);
+                  setExpandedPlayer(null);
+                }
+              : undefined
+          }
           onEnded={() => advanceToNext(false)}
           onClose={() => setExpandedPlayer(null)}
         />
@@ -772,191 +825,219 @@ export default function App() {
         />
       )}
 
-      {error && viewMode === 'channel' && channel && (
-        <div className="mx-auto max-w-[1360px] px-3 pt-4 sm:px-6">
-          <div
-            role="alert"
-            className="rounded-xl border border-[#E11D48]/30 bg-[#E11D48]/5 px-4 py-3 text-sm text-[#BE123C]"
-          >
-            {error}
+      <div className="lg:pl-60 xl:pl-64">
+        {error && viewMode === 'channel' && channel && (
+          <div className="mx-auto max-w-[1440px] px-3 pt-4 sm:px-6">
+            <div
+              role="alert"
+              className="rounded-xl border border-[#E11D48]/30 bg-[#E11D48]/5 px-4 py-3 text-sm text-[#BE123C]"
+            >
+              {error}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {viewMode === 'search' ? (
-        <SearchResultsView
-          appMode={appMode}
-          searchQuery={searchQuery}
-          videos={searchVideosList}
-          channels={searchChannelsList}
-          hasMore={Boolean(searchContinuation)}
-          loading={loadingSearch}
-          loadingMore={loadingMoreSearch}
-          error={searchError}
-          playingItem={playingItem}
-          hasExpandedPlayer={Boolean(expandedPlayer)}
-          hasChannelOpen={Boolean(channel)}
-          isLiked={isLiked}
-          onPlayItem={handlePlayItem}
-          onStopPlay={() => setPlayingItem(null)}
-          onEnded={() => advanceToNext(false)}
-          onExpandFull={(item, initialRotation) =>
-            setExpandedPlayer({ item, initialRotation })
-          }
-          onToggleLike={handleToggleLike}
-          onOpenChannel={(path) => fetchChannel(path, 'videos', false)}
-          onLoadMore={handleLoadMoreSearch}
-          onBack={() => {
-            if (channel) {
-              setViewMode('channel');
-              window.history.replaceState(null, '', `#${encodeURIComponent(channel.path)}`);
-            } else {
-              handleResetHome();
+        {viewMode === 'search' ? (
+          <SearchResultsView
+            appMode={appMode}
+            isDesktop={isDesktop}
+            searchQuery={searchQuery}
+            videos={searchVideosList}
+            channels={searchChannelsList}
+            hasMore={Boolean(searchContinuation)}
+            loading={loadingSearch}
+            loadingMore={loadingMoreSearch}
+            error={searchError}
+            playingItem={playingItem}
+            startSeconds={playerStartSeconds}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
+            hasExpandedPlayer={Boolean(expandedPlayer)}
+            hasChannelOpen={Boolean(channel)}
+            isLiked={isLiked}
+            onPlayItem={handlePlayItem}
+            onStopPlay={() => setPlayingItem(null)}
+            onPrev={goPrev}
+            onNext={() => advanceToNext(true)}
+            onEnded={() => advanceToNext(false)}
+            onExpandFull={(item, initialRotation, sec) =>
+              setExpandedPlayer({ item, initialRotation, startSeconds: sec })
             }
-          }}
-        />
-      ) : viewMode === 'feed' ? (
-        <FeedView
-          appMode={appMode}
-          items={feedItems}
-          seeds={feedSeedInfo.seeds}
-          activeSeed={activeFeedSeed}
-          personalized={feedSeedInfo.personalized}
-          loading={loadingFeed}
-          error={feedError}
-          playingItem={playingItem}
-          hasExpandedPlayer={Boolean(expandedPlayer)}
-          hasChannelOpen={Boolean(channel)}
-          isLiked={isLiked}
-          onSelectSeed={(seed) => {
-            setActiveFeedSeed(seed);
-            loadFeed(seed);
-          }}
-          onRefresh={() => loadFeed(activeFeedSeed)}
-          onPlayItem={handlePlayItem}
-          onStopPlay={() => setPlayingItem(null)}
-          onEnded={() => advanceToNext(false)}
-          onExpandFull={(item, initialRotation) =>
-            setExpandedPlayer({ item, initialRotation })
-          }
-          onToggleLike={handleToggleLike}
-          onOpenChannel={(path) => fetchChannel(path, 'videos', false)}
-          onBack={() => {
-            if (channel) {
-              setViewMode('channel');
-              window.history.replaceState(null, '', `#${encodeURIComponent(channel.path)}`);
-            } else {
-              handleResetHome();
+            onToggleLike={handleToggleLike}
+            onOpenChannel={(path) => fetchChannel(path, 'videos', false)}
+            onLoadMore={handleLoadMoreSearch}
+            onBack={() => {
+              if (channel) {
+                setViewMode('channel');
+                window.history.replaceState(null, '', `#${encodeURIComponent(channel.path)}`);
+              } else {
+                handleResetHome();
+              }
+            }}
+          />
+        ) : viewMode === 'feed' ? (
+          <FeedView
+            appMode={appMode}
+            isDesktop={isDesktop}
+            items={feedItems}
+            seeds={feedSeedInfo.seeds}
+            activeSeed={activeFeedSeed}
+            personalized={feedSeedInfo.personalized}
+            loading={loadingFeed}
+            error={feedError}
+            playingItem={playingItem}
+            startSeconds={playerStartSeconds}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
+            hasExpandedPlayer={Boolean(expandedPlayer)}
+            hasChannelOpen={Boolean(channel)}
+            isLiked={isLiked}
+            onSelectSeed={(seed) => {
+              setActiveFeedSeed(seed);
+              loadFeed(seed);
+            }}
+            onRefresh={() => loadFeed(activeFeedSeed)}
+            onPlayItem={handlePlayItem}
+            onStopPlay={() => setPlayingItem(null)}
+            onPrev={goPrev}
+            onNext={() => advanceToNext(true)}
+            onEnded={() => advanceToNext(false)}
+            onExpandFull={(item, initialRotation, sec) =>
+              setExpandedPlayer({ item, initialRotation, startSeconds: sec })
             }
-          }}
-        />
-      ) : viewMode === 'following' ? (
-        <FollowingView
-          followedChannels={followedChannels}
-          hasChannelOpen={Boolean(channel)}
-          onOpenChannel={(path) => fetchChannel(path, 'videos', false)}
-          onUnfollow={handleUnfollow}
-          onBack={() => {
-            if (channel) {
-              setViewMode('channel');
-              window.history.replaceState(null, '', `#${encodeURIComponent(channel.path)}`);
-            } else {
-              handleResetHome();
+            onToggleLike={handleToggleLike}
+            onOpenChannel={(path) => fetchChannel(path, 'videos', false)}
+            onBack={() => {
+              if (channel) {
+                setViewMode('channel');
+                window.history.replaceState(null, '', `#${encodeURIComponent(channel.path)}`);
+              } else {
+                handleResetHome();
+              }
+            }}
+          />
+        ) : viewMode === 'following' ? (
+          <FollowingView
+            followedChannels={followedChannels}
+            hasChannelOpen={Boolean(channel)}
+            onOpenChannel={(path) => fetchChannel(path, 'videos', false)}
+            onUnfollow={handleUnfollow}
+            onBack={() => {
+              if (channel) {
+                setViewMode('channel');
+                window.history.replaceState(null, '', `#${encodeURIComponent(channel.path)}`);
+              } else {
+                handleResetHome();
+              }
+            }}
+          />
+        ) : viewMode === 'liked' ? (
+          <LikedPlaylistView
+            appMode={appMode}
+            isDesktop={isDesktop}
+            likedItems={likedItems}
+            playingItem={playingItem}
+            startSeconds={playerStartSeconds}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
+            hasExpandedPlayer={Boolean(expandedPlayer)}
+            autoPlayNext={autoPlayNext}
+            loopQueue={loopQueue}
+            hasChannelOpen={Boolean(channel)}
+            onPlayTrack={handlePlayLikedTrack}
+            onStopPlay={() => setPlayingItem(null)}
+            onPrev={goPrev}
+            onNext={() => advanceToNext(true)}
+            onEnded={() => advanceToNext(false)}
+            onExpandFull={(item, initialRotation, sec) =>
+              setExpandedPlayer({ item, initialRotation, startSeconds: sec })
             }
-          }}
-        />
-      ) : viewMode === 'liked' ? (
-        <LikedPlaylistView
-          appMode={appMode}
-          likedItems={likedItems}
-          playingItem={playingItem}
-          hasExpandedPlayer={Boolean(expandedPlayer)}
-          autoPlayNext={autoPlayNext}
-          loopQueue={loopQueue}
-          hasChannelOpen={Boolean(channel)}
-          onPlayTrack={handlePlayLikedTrack}
-          onStopPlay={() => setPlayingItem(null)}
-          onEnded={() => advanceToNext(false)}
-          onExpandFull={(item, initialRotation) =>
-            setExpandedPlayer({ item, initialRotation })
-          }
-          onToggleAutoPlay={() => setAutoPlayNext((v) => !v)}
-          onToggleLoop={() => setLoopQueue((v) => !v)}
-          onToggleLike={handleToggleLike}
-          onClearAll={handleClearLiked}
-          onBack={() => {
-            if (channel) {
-              setViewMode('channel');
-              window.history.replaceState(null, '', `#${encodeURIComponent(channel.path)}`);
-            } else {
-              handleResetHome();
+            onToggleAutoPlay={() => setAutoPlayNext((v) => !v)}
+            onToggleLoop={() => setLoopQueue((v) => !v)}
+            onToggleLike={handleToggleLike}
+            onClearAll={handleClearLiked}
+            onBack={() => {
+              if (channel) {
+                setViewMode('channel');
+                window.history.replaceState(null, '', `#${encodeURIComponent(channel.path)}`);
+              } else {
+                handleResetHome();
+              }
+            }}
+          />
+        ) : viewMode === 'channel' && channel ? (
+          <ChannelView
+            appMode={appMode}
+            isDesktop={isDesktop}
+            channel={channel}
+            activeTab={activeTab}
+            items={items}
+            playlists={playlists}
+            about={about}
+            hasMore={Boolean(continuation)}
+            loadingTab={loadingTab}
+            loadingMore={loadingMore}
+            loadingAll={loadingAll}
+            playingItem={playingItem}
+            startSeconds={playerStartSeconds}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
+            hasExpandedPlayer={Boolean(expandedPlayer)}
+            activePlaylist={activePlaylist}
+            loadingPlaylist={loadingPlaylist}
+            isFollowed={
+              followedIdSet.has(channel.id || channel.path) ||
+              followedChannels.some((f) => f.path === channel.path)
             }
-          }}
-        />
-      ) : viewMode === 'channel' && channel ? (
-        <ChannelView
-          appMode={appMode}
-          channel={channel}
-          activeTab={activeTab}
-          items={items}
-          playlists={playlists}
-          about={about}
-          hasMore={Boolean(continuation)}
-          loadingTab={loadingTab}
-          loadingMore={loadingMore}
-          loadingAll={loadingAll}
-          playingItem={playingItem}
-          hasExpandedPlayer={Boolean(expandedPlayer)}
-          activePlaylist={activePlaylist}
-          loadingPlaylist={loadingPlaylist}
-          isFollowed={
-            followedIdSet.has(channel.id || channel.path) ||
-            followedChannels.some((f) => f.path === channel.path)
-          }
-          isLiked={isLiked}
-          onToggleFollow={handleToggleFollow}
-          onToggleLike={handleToggleLike}
-          onChangeTab={(tab) => fetchChannel(channel.path, tab, true)}
-          onLoadMore={handleLoadMore}
-          onLoadAll={handleLoadAll}
-          onStopLoadAll={() => {
-            stopLoadAllRef.current = true;
-          }}
-          onPlayItem={handlePlayItem}
-          onStopPlay={() => setPlayingItem(null)}
-          onEnded={() => advanceToNext(false)}
-          onExpandFull={(item, initialRotation) =>
-            setExpandedPlayer({ item, initialRotation })
-          }
-          onOpenPlaylist={handleOpenPlaylist}
-          onClosePlaylist={() => setActivePlaylist(null)}
-        />
-      ) : (
-        <ExploreHome
-          appMode={appMode}
-          onChangeMode={handleChangeMode}
-          loading={loadingChannel}
-          error={error}
-          likedItems={likedItems}
-          followedChannels={followedChannels}
-          recentChannels={recentChannels}
-          onSubmitChannel={(input) => fetchChannel(input, 'videos', false)}
-          onOpenFollowing={() => {
-            setViewMode('following');
-            window.history.replaceState(null, '', '#following');
-          }}
-          onOpenLiked={() => {
-            setViewMode('liked');
-            window.history.replaceState(null, '', '#liked');
-          }}
-          onPlayLikedAll={() => {
-            if (likedItems[0]) {
+            isLiked={isLiked}
+            onToggleFollow={handleToggleFollow}
+            onToggleLike={handleToggleLike}
+            onChangeTab={(tab) => fetchChannel(channel.path, tab, true)}
+            onLoadMore={handleLoadMore}
+            onLoadAll={handleLoadAll}
+            onStopLoadAll={() => {
+              stopLoadAllRef.current = true;
+            }}
+            onPlayItem={handlePlayItem}
+            onStopPlay={() => setPlayingItem(null)}
+            onPrev={goPrev}
+            onNext={() => advanceToNext(true)}
+            onEnded={() => advanceToNext(false)}
+            onExpandFull={(item, initialRotation, sec) =>
+              setExpandedPlayer({ item, initialRotation, startSeconds: sec })
+            }
+            onOpenPlaylist={handleOpenPlaylist}
+            onClosePlaylist={() => setActivePlaylist(null)}
+          />
+        ) : (
+          <ExploreHome
+            appMode={appMode}
+            onChangeMode={handleChangeMode}
+            loading={loadingChannel}
+            error={error}
+            likedItems={likedItems}
+            followedChannels={followedChannels}
+            recentChannels={recentChannels}
+            onSubmitChannel={(input) => fetchChannel(input, 'videos', false)}
+            onOpenFollowing={() => {
+              setViewMode('following');
+              window.history.replaceState(null, '', '#following');
+            }}
+            onOpenLiked={() => {
               setViewMode('liked');
-              handlePlayLikedTrack(likedItems[0], false);
-            }
-          }}
-        />
-      )}
+              window.history.replaceState(null, '', '#liked');
+            }}
+            onPlayLikedAll={() => {
+              if (likedItems[0]) {
+                setViewMode('liked');
+                handlePlayLikedTrack(likedItems[0], false);
+              }
+            }}
+          />
+        )}
+      </div>
+
+      <OfflineIndicator />
     </div>
   );
 }

@@ -1,21 +1,32 @@
 import { ArrowLeft, Heart, Play, Repeat, Search, Shuffle, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { LikedItem, MediaItem } from '../types';
+import { DesktopSplitPlayer } from './DesktopSplitPlayer';
 import { MediaCard } from './MediaCard';
 import { MusicTrackRow } from './MusicTrackRow';
 
 interface LikedPlaylistViewProps {
   appMode: 'videos' | 'music';
+  isDesktop: boolean;
   likedItems: LikedItem[];
   playingItem: MediaItem | null;
+  startSeconds: number;
+  hasPrev: boolean;
+  hasNext: boolean;
   hasExpandedPlayer: boolean;
   autoPlayNext: boolean;
   loopQueue: boolean;
   hasChannelOpen: boolean;
   onPlayTrack: (item: MediaItem, shuffle?: boolean) => void;
   onStopPlay: () => void;
+  onPrev: () => void;
+  onNext: () => void;
   onEnded: () => void;
-  onExpandFull: (item: MediaItem, initialRotation: 0 | 90 | 180 | 270) => void;
+  onExpandFull: (
+    item: MediaItem,
+    initialRotation: 0 | 90 | 180 | 270,
+    startSeconds?: number
+  ) => void;
   onToggleAutoPlay: () => void;
   onToggleLoop: () => void;
   onToggleLike: (item: MediaItem) => void;
@@ -25,14 +36,20 @@ interface LikedPlaylistViewProps {
 
 export function LikedPlaylistView({
   appMode,
+  isDesktop,
   likedItems,
   playingItem,
+  startSeconds,
+  hasPrev,
+  hasNext,
   hasExpandedPlayer,
   autoPlayNext,
   loopQueue,
   hasChannelOpen,
   onPlayTrack,
   onStopPlay,
+  onPrev,
+  onNext,
   onEnded,
   onExpandFull,
   onToggleAutoPlay,
@@ -54,8 +71,11 @@ export function LikedPlaylistView({
     );
   }, [likedItems, filterText]);
 
+  const splitActive =
+    isDesktop && appMode === 'videos' && Boolean(playingItem) && !hasExpandedPlayer;
+
   return (
-    <main className="mx-auto max-w-[1360px] px-3 pb-24 pt-5 sm:px-6 sm:pt-6">
+    <main className="mx-auto max-w-[1440px] px-3 pb-24 pt-5 sm:px-6 sm:pt-6">
       <div className="flex flex-col gap-4 border-b border-[#E5E3DD] pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <button
@@ -204,6 +224,25 @@ export function LikedPlaylistView({
             />
           ))}
         </div>
+      ) : splitActive && playingItem ? (
+        <div className="mt-6">
+          <DesktopSplitPlayer
+            playingItem={playingItem}
+            queue={filtered}
+            queueTitle="Liked Playlist"
+            startSeconds={startSeconds}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
+            isLiked={() => true}
+            onSelectVideo={(clicked) => onPlayTrack(clicked, false)}
+            onPrev={onPrev}
+            onNext={onNext}
+            onEnded={onEnded}
+            onToggleLike={onToggleLike}
+            onOpenFull={(sec) => onExpandFull(playingItem, 0, sec)}
+            onClose={onStopPlay}
+          />
+        </div>
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((item) => (
@@ -211,7 +250,7 @@ export function LikedPlaylistView({
               key={item.id}
               item={item}
               isPlaying={playingItem?.id === item.id}
-              suppressInlineFrame={hasExpandedPlayer}
+              suppressInlineFrame={hasExpandedPlayer || isDesktop}
               isLiked={true}
               onPlay={(clicked) => onPlayTrack(clicked, false)}
               onStopPlay={onStopPlay}

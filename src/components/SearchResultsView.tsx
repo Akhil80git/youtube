@@ -1,10 +1,12 @@
 import { ArrowLeft, Loader2, Play, Search } from 'lucide-react';
 import type { ChannelSearchResult, MediaItem } from '../types';
+import { DesktopSplitPlayer } from './DesktopSplitPlayer';
 import { MediaCard } from './MediaCard';
 import { MusicTrackRow } from './MusicTrackRow';
 
 interface SearchResultsViewProps {
   appMode: 'videos' | 'music';
+  isDesktop: boolean;
   searchQuery: string;
   videos: MediaItem[];
   channels: ChannelSearchResult[];
@@ -13,13 +15,22 @@ interface SearchResultsViewProps {
   loadingMore: boolean;
   error: string | null;
   playingItem: MediaItem | null;
+  startSeconds: number;
+  hasPrev: boolean;
+  hasNext: boolean;
   hasExpandedPlayer: boolean;
   hasChannelOpen: boolean;
   isLiked: (id: string) => boolean;
   onPlayItem: (item: MediaItem, queue: MediaItem[]) => void;
   onStopPlay: () => void;
+  onPrev: () => void;
+  onNext: () => void;
   onEnded: () => void;
-  onExpandFull: (item: MediaItem, initialRotation: 0 | 90 | 180 | 270) => void;
+  onExpandFull: (
+    item: MediaItem,
+    initialRotation: 0 | 90 | 180 | 270,
+    startSeconds?: number
+  ) => void;
   onToggleLike: (item: MediaItem) => void;
   onOpenChannel: (path: string) => void;
   onLoadMore: () => void;
@@ -28,6 +39,7 @@ interface SearchResultsViewProps {
 
 export function SearchResultsView({
   appMode,
+  isDesktop,
   searchQuery,
   videos,
   channels,
@@ -36,11 +48,16 @@ export function SearchResultsView({
   loadingMore,
   error,
   playingItem,
+  startSeconds,
+  hasPrev,
+  hasNext,
   hasExpandedPlayer,
   hasChannelOpen,
   isLiked,
   onPlayItem,
   onStopPlay,
+  onPrev,
+  onNext,
   onEnded,
   onExpandFull,
   onToggleLike,
@@ -48,8 +65,11 @@ export function SearchResultsView({
   onLoadMore,
   onBack,
 }: SearchResultsViewProps) {
+  const splitActive =
+    isDesktop && appMode === 'videos' && Boolean(playingItem) && !hasExpandedPlayer;
+
   return (
-    <main className="mx-auto max-w-[1360px] px-3 pb-24 pt-5 sm:px-6 sm:pt-6">
+    <main className="mx-auto max-w-[1440px] px-3 pb-24 pt-5 sm:px-6 sm:pt-6">
       <div className="flex flex-col gap-4 border-b border-[#E5E3DD] pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <button
@@ -172,6 +192,29 @@ export function SearchResultsView({
                     />
                   ))}
                 </div>
+              ) : splitActive && playingItem ? (
+                <div className="mt-6">
+                  <DesktopSplitPlayer
+                    playingItem={playingItem}
+                    queue={videos}
+                    queueTitle={searchQuery ? `Search · ${searchQuery}` : 'Search Results'}
+                    startSeconds={startSeconds}
+                    hasPrev={hasPrev}
+                    hasNext={hasNext}
+                    isLiked={isLiked}
+                    hasMore={hasMore}
+                    loadingMore={loadingMore}
+                    onLoadMore={onLoadMore}
+                    onSelectVideo={(clicked) => onPlayItem(clicked, videos)}
+                    onPrev={onPrev}
+                    onNext={onNext}
+                    onEnded={onEnded}
+                    onToggleLike={onToggleLike}
+                    onOpenFull={(sec) => onExpandFull(playingItem, 0, sec)}
+                    onClose={onStopPlay}
+                    onOpenChannel={onOpenChannel}
+                  />
+                </div>
               ) : (
                 <div className="mt-6 grid grid-cols-1 gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {videos.map((item) => (
@@ -179,7 +222,7 @@ export function SearchResultsView({
                       key={item.id}
                       item={item}
                       isPlaying={playingItem?.id === item.id}
-                      suppressInlineFrame={hasExpandedPlayer}
+                      suppressInlineFrame={hasExpandedPlayer || isDesktop}
                       isLiked={isLiked(item.id)}
                       onPlay={(clicked) => onPlayItem(clicked, videos)}
                       onStopPlay={onStopPlay}
@@ -192,7 +235,7 @@ export function SearchResultsView({
                 </div>
               )}
 
-              {hasMore && (
+              {hasMore && !splitActive && (
                 <div className="mt-10 flex items-center justify-between border-t border-[#E5E3DD] pt-6">
                   <p className="text-xs tabular-nums text-[#5C5A55]">
                     Showing {videos.length} results

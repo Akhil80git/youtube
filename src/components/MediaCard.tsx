@@ -247,7 +247,7 @@ export function MediaCard({
               type="button"
               onClick={handleRotateClick}
               title="Hard Rotate Video"
-              className={`inline-flex h-8 cursor-pointer items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors ${
+              className={`inline-flex lg:hidden h-8 cursor-pointer items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors ${
                 rotation !== 0
                   ? 'bg-[#111111] text-white'
                   : 'bg-[#FAF9F7] text-[#111111] hover:bg-[#EAE7E1]'
