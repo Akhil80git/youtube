@@ -1,8 +1,17 @@
 export interface YTPlayerInstance {
-  loadVideoById: (id: string) => void;
+  loadVideoById: (
+    idOrOpts: string | { videoId: string; suggestedQuality?: string }
+  ) => void;
   destroy: () => void;
   playVideo: () => void;
   pauseVideo: () => void;
+  seekTo?: (seconds: number, allowSeekAhead?: boolean) => void;
+  getCurrentTime?: () => number;
+  getDuration?: () => number;
+  setPlaybackQuality?: (suggestedQuality: string) => void;
+  mute?: () => void;
+  unMute?: () => void;
+  isMuted?: () => boolean;
 }
 
 declare global {

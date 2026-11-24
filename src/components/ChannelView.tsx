@@ -18,8 +18,10 @@ import type {
   PlaylistDetailResponse,
 } from '../types';
 import { MediaCard, PlaylistCardItem } from './MediaCard';
+import { MusicTrackRow } from './MusicTrackRow';
 
 interface ChannelViewProps {
+  appMode: 'videos' | 'music';
   channel: ChannelInfo;
   activeTab: ChannelTab;
   items: MediaItem[];
@@ -70,6 +72,7 @@ function parseViewNumber(text: string): number {
 }
 
 export function ChannelView({
+  appMode,
   channel,
   activeTab,
   items,
@@ -120,7 +123,7 @@ export function ChannelView({
   }, [playlists, filterText]);
 
   return (
-    <main className="mx-auto max-w-[1360px] px-3 pb-16 pt-4 sm:px-6 sm:pt-6">
+    <main className="mx-auto max-w-[1360px] px-3 pb-24 pt-4 sm:px-6 sm:pt-6">
       {/* Channel Banner */}
       {channel.banner && !bannerError && (
         <div className="mb-4 aspect-[4/1] w-full overflow-hidden rounded-xl bg-[#EAE7E1] sm:mb-6 sm:aspect-[6/1] sm:rounded-2xl">
@@ -395,24 +398,42 @@ export function ChannelView({
               )}
             </div>
 
-            <div className="grid grid-cols-1 gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {activePlaylist.videos.map((vid) => (
-                <MediaCard
-                  key={vid.id}
-                  item={vid}
-                  isPlaying={playingItem?.id === vid.id}
-                  suppressInlineFrame={hasExpandedPlayer}
-                  isLiked={isLiked(vid.id)}
-                  onPlay={(item) =>
-                    onPlayItem(item, activePlaylist.videos, activePlaylist.title)
-                  }
-                  onStopPlay={onStopPlay}
-                  onEnded={onEnded}
-                  onExpandFull={onExpandFull}
-                  onToggleLike={onToggleLike}
-                />
-              ))}
-            </div>
+            {appMode === 'music' ? (
+              <div className="space-y-2">
+                {activePlaylist.videos.map((vid, idx) => (
+                  <MusicTrackRow
+                    key={vid.id}
+                    item={vid}
+                    index={idx}
+                    isPlaying={playingItem?.id === vid.id}
+                    isLiked={isLiked(vid.id)}
+                    onPlay={(item) =>
+                      onPlayItem(item, activePlaylist.videos, activePlaylist.title)
+                    }
+                    onToggleLike={onToggleLike}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {activePlaylist.videos.map((vid) => (
+                  <MediaCard
+                    key={vid.id}
+                    item={vid}
+                    isPlaying={playingItem?.id === vid.id}
+                    suppressInlineFrame={hasExpandedPlayer}
+                    isLiked={isLiked(vid.id)}
+                    onPlay={(item) =>
+                      onPlayItem(item, activePlaylist.videos, activePlaylist.title)
+                    }
+                    onStopPlay={onStopPlay}
+                    onEnded={onEnded}
+                    onExpandFull={onExpandFull}
+                    onToggleLike={onToggleLike}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         ) : filteredPlaylists.length === 0 ? (
           <div className="py-16 text-center text-sm text-[#5C5A55]">
@@ -433,28 +454,44 @@ export function ChannelView({
         </div>
       ) : (
         <>
-          <div
-            className={`mt-6 grid gap-x-4 gap-y-7 sm:gap-x-5 sm:gap-y-8 ${
-              activeTab === 'shorts'
-                ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
-                : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-            }`}
-          >
-            {filteredItems.map((item) => (
-              <MediaCard
-                key={item.id}
-                item={item}
-                isPlaying={playingItem?.id === item.id}
-                suppressInlineFrame={hasExpandedPlayer}
-                isLiked={isLiked(item.id)}
-                onPlay={(clicked) => onPlayItem(clicked)}
-                onStopPlay={onStopPlay}
-                onEnded={onEnded}
-                onExpandFull={onExpandFull}
-                onToggleLike={onToggleLike}
-              />
-            ))}
-          </div>
+          {appMode === 'music' ? (
+            <div className="mt-6 space-y-2">
+              {filteredItems.map((item, idx) => (
+                <MusicTrackRow
+                  key={item.id}
+                  item={item}
+                  index={idx}
+                  isPlaying={playingItem?.id === item.id}
+                  isLiked={isLiked(item.id)}
+                  onPlay={(clicked) => onPlayItem(clicked)}
+                  onToggleLike={onToggleLike}
+                />
+              ))}
+            </div>
+          ) : (
+            <div
+              className={`mt-6 grid gap-x-4 gap-y-7 sm:gap-x-5 sm:gap-y-8 ${
+                activeTab === 'shorts'
+                  ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
+                  : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+              }`}
+            >
+              {filteredItems.map((item) => (
+                <MediaCard
+                  key={item.id}
+                  item={item}
+                  isPlaying={playingItem?.id === item.id}
+                  suppressInlineFrame={hasExpandedPlayer}
+                  isLiked={isLiked(item.id)}
+                  onPlay={(clicked) => onPlayItem(clicked)}
+                  onStopPlay={onStopPlay}
+                  onEnded={onEnded}
+                  onExpandFull={onExpandFull}
+                  onToggleLike={onToggleLike}
+                />
+              ))}
+            </div>
+          )}
 
           {/* Pagination Footer */}
           <div className="mt-10 flex flex-col gap-4 border-t border-[#E5E3DD] pt-6 sm:flex-row sm:items-center sm:justify-between">

@@ -1,8 +1,10 @@
 import { ArrowLeft, Compass, Loader2, Play, RefreshCw } from 'lucide-react';
 import type { MediaItem } from '../types';
 import { MediaCard } from './MediaCard';
+import { MusicTrackRow } from './MusicTrackRow';
 
 interface FeedViewProps {
+  appMode: 'videos' | 'music';
   items: MediaItem[];
   seeds: string[];
   activeSeed: string | null;
@@ -25,6 +27,7 @@ interface FeedViewProps {
 }
 
 export function FeedView({
+  appMode,
   items,
   seeds,
   activeSeed,
@@ -46,7 +49,7 @@ export function FeedView({
   onBack,
 }: FeedViewProps) {
   return (
-    <main className="mx-auto max-w-[1360px] px-3 pb-16 pt-5 sm:px-6 sm:pt-6">
+    <main className="mx-auto max-w-[1360px] px-3 pb-24 pt-5 sm:px-6 sm:pt-6">
       <div className="flex flex-col gap-4 border-b border-[#E5E3DD] pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <button
@@ -161,6 +164,21 @@ export function FeedView({
             <Loader2 className="hidden h-3.5 w-3.5" />
             <span>Load Discovery Mix</span>
           </button>
+        </div>
+      ) : appMode === 'music' ? (
+        <div className="mt-6 space-y-2">
+          {items.map((item, idx) => (
+            <MusicTrackRow
+              key={item.id}
+              item={item}
+              index={idx}
+              isPlaying={playingItem?.id === item.id}
+              isLiked={isLiked(item.id)}
+              onPlay={(clicked) => onPlayItem(clicked, items)}
+              onToggleLike={onToggleLike}
+              onOpenChannel={onOpenChannel}
+            />
+          ))}
         </div>
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

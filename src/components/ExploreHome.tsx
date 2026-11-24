@@ -1,8 +1,10 @@
-import { ArrowRight, Heart, Play, Search, Users } from 'lucide-react';
+import { ArrowRight, Film, Heart, Music, Play, Search, Users } from 'lucide-react';
 import { useState } from 'react';
 import type { FollowedChannel, LikedItem } from '../types';
 
 interface ExploreHomeProps {
+  appMode: 'videos' | 'music';
+  onChangeMode: (mode: 'videos' | 'music') => void;
   loading: boolean;
   error: string | null;
   likedItems: LikedItem[];
@@ -14,7 +16,7 @@ interface ExploreHomeProps {
   onPlayLikedAll: () => void;
 }
 
-const STARTER_CHANNELS = [
+const VIDEO_STARTER_CHANNELS = [
   { name: 'Fireship', handle: '@Fireship', note: 'Software & Tech' },
   { name: 'Veritasium', handle: '@veritasium', note: 'Science & Physics' },
   { name: 'Marques Brownlee', handle: '@mkbhd', note: 'Tech Reviews' },
@@ -23,7 +25,18 @@ const STARTER_CHANNELS = [
   { name: '3Blue1Brown', handle: '@3blue1brown', note: 'Mathematics' },
 ];
 
+const MUSIC_STARTER_CHANNELS = [
+  { name: 'T-Series', handle: '@tseries', note: 'Bollywood & Hits' },
+  { name: 'Lofi Girl', handle: '@LofiGirl', note: 'Chill & Study Beats' },
+  { name: 'Coke Studio', handle: '@cokestudio', note: 'Live Sessions' },
+  { name: 'Chillhop Music', handle: '@ChillhopMusic', note: 'Lofi & Jazzhop' },
+  { name: 'Sony Music India', handle: '@SonyMusicIndia', note: 'Trending Tracks' },
+  { name: 'NPR Music', handle: '@nprmusic', note: 'Tiny Desk Concerts' },
+];
+
 export function ExploreHome({
+  appMode,
+  onChangeMode,
   loading,
   error,
   likedItems,
@@ -35,6 +48,7 @@ export function ExploreHome({
   onPlayLikedAll,
 }: ExploreHomeProps) {
   const [heroInput, setHeroInput] = useState('');
+  const starterList = appMode === 'music' ? MUSIC_STARTER_CHANNELS : VIDEO_STARTER_CHANNELS;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -44,14 +58,60 @@ export function ExploreHome({
   }
 
   return (
-    <main className="mx-auto max-w-[960px] px-4 py-10 sm:px-6 sm:py-20">
+    <main className="mx-auto max-w-[960px] px-4 pb-24 pt-7 sm:px-6 sm:pt-12">
+      {/* Top Mode Switch: Videos (default) vs Music */}
+      <div className="mb-7 flex items-center justify-between gap-4 sm:mb-9">
+        <div
+          role="tablist"
+          aria-label="Playback mode"
+          className="inline-flex rounded-xl border border-[#E5E3DD] bg-[#F2F0EC] p-1"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={appMode === 'videos'}
+            onClick={() => onChangeMode('videos')}
+            className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors whitespace-nowrap ${
+              appMode === 'videos'
+                ? 'bg-[#111111] text-white shadow-xs'
+                : 'text-[#5C5A55] hover:text-[#111111]'
+            }`}
+          >
+            <Film className="h-4 w-4" />
+            <span>Videos</span>
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={appMode === 'music'}
+            onClick={() => onChangeMode('music')}
+            className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors whitespace-nowrap ${
+              appMode === 'music'
+                ? 'bg-[#E11D48] text-white shadow-xs'
+                : 'text-[#5C5A55] hover:text-[#111111]'
+            }`}
+          >
+            <Music className="h-4 w-4" />
+            <span>Music</span>
+          </button>
+        </div>
+
+        <span className="hidden text-xs text-[#73716C] sm:inline">
+          {appMode === 'music' ? 'Audio-only low-data mode' : 'Full video playback mode'}
+        </span>
+      </div>
+
       <div className="max-w-2xl">
         <h1 className="font-display text-3xl font-bold tracking-tight text-[#111111] sm:text-5xl [text-wrap:balance]">
-          Any channel, all videos, zero clutter.
+          {appMode === 'music'
+            ? 'Pure music from any channel, zero video data.'
+            : 'Any channel, all videos, zero clutter.'}
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-[#5C5A55] sm:mt-4 sm:text-lg">
-          Enter any YouTube channel handle, URL, or name. Follow your favorite channels, like
-          tracks to build an auto-playing playlist, and watch right here — free, with no API keys.
+          {appMode === 'music'
+            ? 'Search any music channel or artist, listen to audio-only tracks with minimal data usage, and queue your liked songs continuously.'
+            : 'Enter any YouTube channel handle, URL, or name. Follow your favorite channels, like tracks to build an auto-playing playlist, and watch right here — free, with no API keys.'}
         </p>
       </div>
 
@@ -65,7 +125,11 @@ export function ExploreHome({
             type="text"
             value={heroInput}
             onChange={(e) => setHeroInput(e.target.value)}
-            placeholder="Try @LofiGirl, @tseries, or youtube.com/@Fireship..."
+            placeholder={
+              appMode === 'music'
+                ? 'Try @tseries, @LofiGirl, or artist channel...'
+                : 'Try @LofiGirl, @tseries, or youtube.com/@Fireship...'
+            }
             aria-label="Enter YouTube channel"
             className="h-12 w-full rounded-xl border border-[#D8D5CE] bg-white pl-11 pr-4 text-sm text-[#111111] placeholder:text-[#73716C] transition-colors focus:border-[#111111] focus:outline-none sm:text-base"
           />
@@ -235,9 +299,11 @@ export function ExploreHome({
       )}
 
       <section className="mt-10 border-t border-[#E5E3DD] pt-7 sm:mt-12 sm:pt-8">
-        <h2 className="font-display text-sm font-semibold text-[#111111]">Quick Start Channels</h2>
+        <h2 className="font-display text-sm font-semibold text-[#111111]">
+          {appMode === 'music' ? 'Music Channels' : 'Quick Start Channels'}
+        </h2>
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-          {STARTER_CHANNELS.map((ch) => (
+          {starterList.map((ch) => (
             <button
               key={ch.handle}
               type="button"

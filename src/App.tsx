@@ -4,6 +4,7 @@ import { ExploreHome } from './components/ExploreHome';
 import { FeedView } from './components/FeedView';
 import { FollowingView } from './components/FollowingView';
 import { LikedPlaylistView } from './components/LikedPlaylistView';
+import { MusicPlayerBar } from './components/MusicPlayerBar';
 import { RotatedFullPlayer } from './components/RotatedFullPlayer';
 import { SearchResultsView } from './components/SearchResultsView';
 import { TopNav } from './components/TopNav';
@@ -103,6 +104,7 @@ function loadStorage<T>(key: string, fallback: T): T {
 }
 
 export default function App() {
+  const [appMode, setAppMode] = useState<'videos' | 'music'>('videos');
   const [query, setQuery] = useState('');
   const [viewMode, setViewMode] = useState<
     'explore' | 'feed' | 'search' | 'channel' | 'following' | 'liked'
@@ -640,6 +642,10 @@ export default function App() {
 
   const activeQueue = playerQueue.length > 0 ? playerQueue : items;
   const currentIndex = playingItem ? activeQueue.findIndex((q) => q.id === playingItem.id) : -1;
+  const hasPrev = currentIndex > 0;
+  const hasNext =
+    activeQueue.length > 1 &&
+    (shuffleQueue || loopQueue || (currentIndex >= 0 && currentIndex < activeQueue.length - 1));
 
   const advanceToNext = useCallback(
     (force = false) => {
@@ -676,6 +682,27 @@ export default function App() {
     ]
   );
 
+  const goPrev = useCallback(() => {
+    if (!hasPrev) return;
+    const prevItem = activeQueue[currentIndex - 1];
+    if (prevItem) {
+      setPlayingItem(prevItem);
+      recordWatch(prevItem);
+      if (expandedPlayer) {
+        setExpandedPlayer((prev) => (prev ? { ...prev, item: prevItem } : null));
+      }
+    }
+  }, [hasPrev, activeQueue, currentIndex, expandedPlayer, recordWatch]);
+
+  function handleChangeMode(nextMode: 'videos' | 'music') {
+    if (nextMode === appMode) return;
+    setAppMode(nextMode);
+    setExpandedPlayer(null);
+    if (nextMode === 'videos') {
+      setPlayingItem(null);
+    }
+  }
+
   function handleResetHome() {
     stopLoadAllRef.current = true;
     setLoadingAll(false);
@@ -686,7 +713,9 @@ export default function App() {
     setAbout(null);
     setContinuation(null);
     setActivePlaylist(null);
-    setPlayingItem(null);
+    if (appMode !== 'music') {
+      setPlayingItem(null);
+    }
     setExpandedPlayer(null);
     setQuery('');
     setError(null);
@@ -724,12 +753,30 @@ export default function App() {
         onResetHome={handleResetHome}
       />
 
-      {expandedPlayer && (
+      {appMode === 'videos' && expandedPlayer && (
         <RotatedFullPlayer
           current={expandedPlayer.item}
           initialRotation={expandedPlayer.initialRotation}
           onEnded={() => advanceToNext(false)}
           onClose={() => setExpandedPlayer(null)}
+        />
+      )}
+
+      {appMode === 'music' && playingItem && (
+        <MusicPlayerBar
+          current={playingItem}
+          hasPrev={hasPrev}
+          hasNext={hasNext}
+          isLiked={isLiked(playingItem.id)}
+          shuffleQueue={shuffleQueue}
+          loopQueue={loopQueue}
+          onPrev={goPrev}
+          onNext={() => advanceToNext(true)}
+          onEnded={() => advanceToNext(false)}
+          onToggleLike={handleToggleLike}
+          onToggleShuffle={() => setShuffleQueue((v) => !v)}
+          onToggleLoop={() => setLoopQueue((v) => !v)}
+          onClose={() => setPlayingItem(null)}
         />
       )}
 
@@ -746,6 +793,7 @@ export default function App() {
 
       {viewMode === 'search' ? (
         <SearchResultsView
+          appMode={appMode}
           searchQuery={searchQuery}
           videos={searchVideosList}
           channels={searchChannelsList}
@@ -777,6 +825,7 @@ export default function App() {
         />
       ) : viewMode === 'feed' ? (
         <FeedView
+          appMode={appMode}
           items={feedItems}
           seeds={feedSeedInfo.seeds}
           activeSeed={activeFeedSeed}
@@ -826,6 +875,7 @@ export default function App() {
         />
       ) : viewMode === 'liked' ? (
         <LikedPlaylistView
+          appMode={appMode}
           likedItems={likedItems}
           playingItem={playingItem}
           hasExpandedPlayer={Boolean(expandedPlayer)}
@@ -853,6 +903,7 @@ export default function App() {
         />
       ) : viewMode === 'channel' && channel ? (
         <ChannelView
+          appMode={appMode}
           channel={channel}
           activeTab={activeTab}
           items={items}
@@ -890,6 +941,8 @@ export default function App() {
         />
       ) : (
         <ExploreHome
+          appMode={appMode}
+          onChangeMode={handleChangeMode}
           loading={loadingChannel}
           error={error}
           likedItems={likedItems}

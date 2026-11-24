@@ -1,8 +1,10 @@
 import { ArrowLeft, Loader2, Play, Search } from 'lucide-react';
 import type { ChannelSearchResult, MediaItem } from '../types';
 import { MediaCard } from './MediaCard';
+import { MusicTrackRow } from './MusicTrackRow';
 
 interface SearchResultsViewProps {
+  appMode: 'videos' | 'music';
   searchQuery: string;
   videos: MediaItem[];
   channels: ChannelSearchResult[];
@@ -25,6 +27,7 @@ interface SearchResultsViewProps {
 }
 
 export function SearchResultsView({
+  appMode,
   searchQuery,
   videos,
   channels,
@@ -46,7 +49,7 @@ export function SearchResultsView({
   onBack,
 }: SearchResultsViewProps) {
   return (
-    <main className="mx-auto max-w-[1360px] px-3 pb-16 pt-5 sm:px-6 sm:pt-6">
+    <main className="mx-auto max-w-[1360px] px-3 pb-24 pt-5 sm:px-6 sm:pt-6">
       <div className="flex flex-col gap-4 border-b border-[#E5E3DD] pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <button
@@ -154,23 +157,40 @@ export function SearchResultsView({
             </div>
           ) : (
             <>
-              <div className="mt-6 grid grid-cols-1 gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {videos.map((item) => (
-                  <MediaCard
-                    key={item.id}
-                    item={item}
-                    isPlaying={playingItem?.id === item.id}
-                    suppressInlineFrame={hasExpandedPlayer}
-                    isLiked={isLiked(item.id)}
-                    onPlay={(clicked) => onPlayItem(clicked, videos)}
-                    onStopPlay={onStopPlay}
-                    onEnded={onEnded}
-                    onExpandFull={onExpandFull}
-                    onToggleLike={onToggleLike}
-                    onOpenChannel={onOpenChannel}
-                  />
-                ))}
-              </div>
+              {appMode === 'music' ? (
+                <div className="mt-6 space-y-2">
+                  {videos.map((item, idx) => (
+                    <MusicTrackRow
+                      key={item.id}
+                      item={item}
+                      index={idx}
+                      isPlaying={playingItem?.id === item.id}
+                      isLiked={isLiked(item.id)}
+                      onPlay={(clicked) => onPlayItem(clicked, videos)}
+                      onToggleLike={onToggleLike}
+                      onOpenChannel={onOpenChannel}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-6 grid grid-cols-1 gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {videos.map((item) => (
+                    <MediaCard
+                      key={item.id}
+                      item={item}
+                      isPlaying={playingItem?.id === item.id}
+                      suppressInlineFrame={hasExpandedPlayer}
+                      isLiked={isLiked(item.id)}
+                      onPlay={(clicked) => onPlayItem(clicked, videos)}
+                      onStopPlay={onStopPlay}
+                      onEnded={onEnded}
+                      onExpandFull={onExpandFull}
+                      onToggleLike={onToggleLike}
+                      onOpenChannel={onOpenChannel}
+                    />
+                  ))}
+                </div>
+              )}
 
               {hasMore && (
                 <div className="mt-10 flex items-center justify-between border-t border-[#E5E3DD] pt-6">

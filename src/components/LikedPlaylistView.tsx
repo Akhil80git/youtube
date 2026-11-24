@@ -2,8 +2,10 @@ import { ArrowLeft, Heart, Play, Repeat, Search, Shuffle, Trash2 } from 'lucide-
 import { useMemo, useState } from 'react';
 import type { LikedItem, MediaItem } from '../types';
 import { MediaCard } from './MediaCard';
+import { MusicTrackRow } from './MusicTrackRow';
 
 interface LikedPlaylistViewProps {
+  appMode: 'videos' | 'music';
   likedItems: LikedItem[];
   playingItem: MediaItem | null;
   hasExpandedPlayer: boolean;
@@ -22,6 +24,7 @@ interface LikedPlaylistViewProps {
 }
 
 export function LikedPlaylistView({
+  appMode,
   likedItems,
   playingItem,
   hasExpandedPlayer,
@@ -52,7 +55,7 @@ export function LikedPlaylistView({
   }, [likedItems, filterText]);
 
   return (
-    <main className="mx-auto max-w-[1360px] px-3 pb-16 pt-5 sm:px-6 sm:pt-6">
+    <main className="mx-auto max-w-[1360px] px-3 pb-24 pt-5 sm:px-6 sm:pt-6">
       <div className="flex flex-col gap-4 border-b border-[#E5E3DD] pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <button
@@ -186,6 +189,20 @@ export function LikedPlaylistView({
       ) : filtered.length === 0 ? (
         <div className="py-16 text-center text-sm text-[#5C5A55]">
           No liked tracks matching &ldquo;{filterText}&rdquo;.
+        </div>
+      ) : appMode === 'music' ? (
+        <div className="mt-6 space-y-2">
+          {filtered.map((item, idx) => (
+            <MusicTrackRow
+              key={item.id}
+              item={item}
+              index={idx}
+              isPlaying={playingItem?.id === item.id}
+              isLiked={true}
+              onPlay={(clicked) => onPlayTrack(clicked, false)}
+              onToggleLike={onToggleLike}
+            />
+          ))}
         </div>
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
