@@ -151,7 +151,6 @@ export function MusicPlayerBar({
     };
   }, [current.id]);
 
-  // Poll progress cleanly while track is active
   useEffect(() => {
     const interval = setInterval(() => {
       const p = playerRef.current;
@@ -168,7 +167,6 @@ export function MusicPlayerBar({
     return () => clearInterval(interval);
   }, []);
 
-  // Media Session metadata for mobile lock-screen / OS controls
   useEffect(() => {
     if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
     try {
@@ -190,7 +188,6 @@ export function MusicPlayerBar({
     }
   }, [current.title, current.channelTitle, current.thumbnail, hasPrev, hasNext, onPrev, onNext]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (playerRef.current) {
@@ -247,7 +244,6 @@ export function MusicPlayerBar({
 
   return (
     <>
-      {/* Hidden 1x1 low-bandwidth audio stream player (never displays video) */}
       <div
         aria-hidden="true"
         className="pointer-events-none fixed -bottom-10 -left-10 h-1 w-1 overflow-hidden opacity-0"
@@ -255,10 +251,10 @@ export function MusicPlayerBar({
         <div ref={hostRef} className="h-full w-full" />
       </div>
 
-      {/* Spotify-style Fixed Bottom Audio Bar (sits above BottomNav on mobile/tablet) */}
+      {/* Music Bar: Pure Light in Light Mode, True Dark in Dark Mode */}
       <aside
         aria-label="Music player"
-        className="fixed inset-x-0 bottom-11 z-40 border-t border-white/10 bg-[#111111]/95 text-white backdrop-blur-md lg:bottom-0 lg:left-60 xl:left-64"
+        className="fixed inset-x-0 bottom-11 z-40 border-t border-[#E5E3DD] bg-white/95 text-[#111111] shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur-md lg:bottom-0 lg:left-60 xl:left-64 dark:border-[#27272F] dark:bg-[#141418]/95 dark:text-[#F4F4F6] dark:shadow-none"
       >
         {/* Interactive Top Progress Strip */}
         <div
@@ -269,7 +265,7 @@ export function MusicPlayerBar({
           aria-valuemax={Math.round(duration)}
           aria-valuenow={Math.round(currentTime)}
           onClick={handleSeek}
-          className="group relative h-1.5 w-full cursor-pointer bg-white/15 transition-all hover:h-2"
+          className="group relative h-1.5 w-full cursor-pointer bg-[#EAE7E1] transition-all hover:h-2 dark:bg-[#27272F]"
         >
           <div
             style={{ width: `${progressPct}%` }}
@@ -280,7 +276,7 @@ export function MusicPlayerBar({
         <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between gap-3 px-3 sm:px-6">
           {/* Left: Square Album Art + Track Details */}
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <div className="h-11 w-11 shrink-0 overflow-hidden rounded-md bg-white/10">
+            <div className="h-11 w-11 shrink-0 overflow-hidden rounded-md bg-[#F2F0EC] dark:bg-[#1E1E24]">
               {current.thumbnail ? (
                 <img
                   src={current.thumbnail}
@@ -289,15 +285,17 @@ export function MusicPlayerBar({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-white/70">
+                <div className="flex h-full w-full items-center justify-center text-[#73716C] dark:text-[#A1A1AA]">
                   <Disc3 className="h-5 w-5" />
                 </div>
               )}
             </div>
 
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-white">{current.title}</div>
-              <div className="flex items-center gap-1.5 truncate text-xs text-white/65">
+              <div className="truncate text-sm font-semibold text-[#111111] dark:text-[#F4F4F6]">
+                {current.title}
+              </div>
+              <div className="flex items-center gap-1.5 truncate text-xs text-[#5C5A55] dark:text-[#A1A1AA]">
                 {current.channelTitle && <span className="truncate">{current.channelTitle}</span>}
                 {current.channelTitle && duration > 0 && <span aria-hidden="true">·</span>}
                 {duration > 0 && (
@@ -309,7 +307,7 @@ export function MusicPlayerBar({
             </div>
           </div>
 
-          {/* Center/Right: Spotify-style Playback Controls */}
+          {/* Center/Right Playback Controls */}
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             <button
               type="button"
@@ -317,7 +315,9 @@ export function MusicPlayerBar({
               aria-label="Toggle shuffle"
               aria-pressed={shuffleQueue}
               className={`hidden h-8 w-8 cursor-pointer items-center justify-center rounded-md transition-colors sm:inline-flex ${
-                shuffleQueue ? 'text-[#E11D48]' : 'text-white/65 hover:text-white'
+                shuffleQueue
+                  ? 'text-[#E11D48]'
+                  : 'text-[#5C5A55] hover:text-[#111111] dark:text-[#A1A1AA] dark:hover:text-white'
               }`}
             >
               <Shuffle className="h-4 w-4" />
@@ -328,7 +328,7 @@ export function MusicPlayerBar({
               disabled={!hasPrev}
               onClick={onPrev}
               aria-label="Previous track"
-              className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+              className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[#111111] transition-colors hover:bg-[#F2F0EC] disabled:cursor-not-allowed disabled:opacity-35 dark:text-[#F4F4F6] dark:hover:bg-[#1E1E24]"
             >
               <SkipBack className="h-4 w-4 fill-current" />
             </button>
@@ -337,7 +337,7 @@ export function MusicPlayerBar({
               type="button"
               onClick={handleTogglePlayPause}
               aria-label={isPlayingState ? 'Pause track' : 'Play track'}
-              className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white text-[#111111] transition-transform hover:scale-105"
+              className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-[#E11D48] text-white transition-transform hover:scale-105 hover:bg-[#BE123C]"
             >
               {isPlayingState ? (
                 <Pause className="h-4 w-4 fill-current" />
@@ -351,7 +351,7 @@ export function MusicPlayerBar({
               disabled={!hasNext}
               onClick={onNext}
               aria-label="Next track"
-              className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+              className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[#111111] transition-colors hover:bg-[#F2F0EC] disabled:cursor-not-allowed disabled:opacity-35 dark:text-[#F4F4F6] dark:hover:bg-[#1E1E24]"
             >
               <SkipForward className="h-4 w-4 fill-current" />
             </button>
@@ -362,7 +362,9 @@ export function MusicPlayerBar({
               aria-label="Toggle loop"
               aria-pressed={loopQueue}
               className={`hidden h-8 w-8 cursor-pointer items-center justify-center rounded-md transition-colors sm:inline-flex ${
-                loopQueue ? 'text-[#E11D48]' : 'text-white/65 hover:text-white'
+                loopQueue
+                  ? 'text-[#E11D48]'
+                  : 'text-[#5C5A55] hover:text-[#111111] dark:text-[#A1A1AA] dark:hover:text-white'
               }`}
             >
               <Repeat className="h-4 w-4" />
@@ -372,7 +374,7 @@ export function MusicPlayerBar({
               type="button"
               onClick={handleToggleMute}
               aria-label={muted ? 'Unmute' : 'Mute'}
-              className="hidden h-8 w-8 cursor-pointer items-center justify-center rounded-md text-white/70 transition-colors hover:text-white md:inline-flex"
+              className="hidden h-8 w-8 cursor-pointer items-center justify-center rounded-md text-[#5C5A55] transition-colors hover:text-[#111111] md:inline-flex dark:text-[#A1A1AA] dark:hover:text-white"
             >
               {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
             </button>
@@ -383,7 +385,9 @@ export function MusicPlayerBar({
               aria-label={isLiked ? 'Unlike track' : 'Like track'}
               aria-pressed={isLiked}
               className={`inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full transition-colors ${
-                isLiked ? 'text-[#E11D48]' : 'text-white/75 hover:text-white'
+                isLiked
+                  ? 'text-[#E11D48]'
+                  : 'text-[#5C5A55] hover:text-[#111111] dark:text-[#A1A1AA] dark:hover:text-white'
               }`}
             >
               <Heart className={`h-4 w-4 ${isLiked ? 'fill-current' : ''}`} />
@@ -393,7 +397,7 @@ export function MusicPlayerBar({
               type="button"
               onClick={onClose}
               aria-label="Close music player"
-              className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+              className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-[#73716C] transition-colors hover:bg-[#F2F0EC] hover:text-[#111111] dark:text-[#A1A1AA] dark:hover:bg-[#1E1E24] dark:hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>

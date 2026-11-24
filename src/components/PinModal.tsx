@@ -92,21 +92,23 @@ export function PinModal({
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/65 p-4 backdrop-blur-xs select-none"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs select-none"
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-xs rounded-2xl border border-[#E5E3DD] bg-white p-5 shadow-2xl"
+        className="w-full max-w-xs rounded-2xl border border-[#E5E3DD] bg-white p-5 shadow-2xl dark:border-[#27272F] dark:bg-[#141418]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#111111] text-white">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#FFF1F3] text-[#E11D48] dark:bg-[#E11D48]/20 dark:text-[#FB7185]">
               {mode === 'verify' ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
             </div>
             <div>
-              <h3 className="font-display text-base font-bold text-[#111111]">{title}</h3>
-              <p className="text-xs text-[#5C5A55]">{subtitle}</p>
+              <h3 className="font-display text-base font-bold text-[#111111] dark:text-[#F4F4F6]">
+                {title}
+              </h3>
+              <p className="text-xs text-[#5C5A55] dark:text-[#A1A1AA]">{subtitle}</p>
             </div>
           </div>
 
@@ -114,7 +116,7 @@ export function PinModal({
             type="button"
             onClick={onCancel}
             aria-label="Cancel"
-            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-[#5C5A55] hover:bg-[#F2F0EC] hover:text-[#111111]"
+            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-[#5C5A55] hover:bg-[#F2F0EC] hover:text-[#111111] dark:text-[#A1A1AA] dark:hover:bg-[#1E1E24] dark:hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>
@@ -125,10 +127,12 @@ export function PinModal({
           <div
             role="status"
             aria-label={`PIN entered: ${value.length} of up to 4 digits`}
-            className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-[#D8D5CE] bg-[#FAF9F7] px-4"
+            className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-[#D8D5CE] bg-[#FAF9F7] px-4 dark:border-[#27272F] dark:bg-[#1E1E24]"
           >
             {value.length === 0 ? (
-              <span className="text-xs text-[#73716C]">Tap 1–4 digits below</span>
+              <span className="text-xs text-[#73716C] dark:text-[#A1A1AA]">
+                Tap 1–4 digits below
+              </span>
             ) : (
               Array.from({ length: 4 }).map((_, idx) => {
                 const filled = idx < value.length;
@@ -136,7 +140,7 @@ export function PinModal({
                   <span
                     key={idx}
                     className={`h-3 w-3 rounded-full transition-all ${
-                      filled ? 'scale-110 bg-[#111111]' : 'bg-[#D8D5CE]'
+                      filled ? 'scale-110 bg-[#E11D48]' : 'bg-[#D8D5CE] dark:bg-[#3F3F46]'
                     }`}
                   />
                 );
@@ -157,7 +161,7 @@ export function PinModal({
                 key={digit}
                 type="button"
                 onClick={() => appendDigit(digit)}
-                className="flex h-11 cursor-pointer items-center justify-center rounded-xl border border-[#E5E3DD] bg-[#FAF9F7] font-mono text-base font-semibold text-[#111111] transition-colors hover:border-[#111111] hover:bg-white active:scale-95"
+                className="flex h-11 cursor-pointer items-center justify-center rounded-xl border border-[#E5E3DD] bg-[#FAF9F7] font-mono text-base font-semibold text-[#111111] transition-colors hover:border-[#E11D48] hover:bg-white hover:text-[#E11D48] active:scale-95 dark:border-[#27272F] dark:bg-[#1E1E24] dark:text-[#F4F4F6] dark:hover:bg-[#27272F]"
               >
                 {digit}
               </button>
@@ -167,7 +171,7 @@ export function PinModal({
               type="button"
               onClick={handleBackspace}
               aria-label="Backspace"
-              className="flex h-11 cursor-pointer items-center justify-center rounded-xl border border-[#E5E3DD] bg-[#FAF9F7] text-[#5C5A55] transition-colors hover:border-[#111111] hover:text-[#111111] active:scale-95"
+              className="flex h-11 cursor-pointer items-center justify-center rounded-xl border border-[#E5E3DD] bg-[#FAF9F7] text-[#5C5A55] transition-colors hover:border-[#E11D48] hover:text-[#E11D48] active:scale-95 dark:border-[#27272F] dark:bg-[#1E1E24] dark:text-[#A1A1AA]"
             >
               <Delete className="h-4 w-4" />
             </button>
@@ -175,7 +179,7 @@ export function PinModal({
             <button
               type="button"
               onClick={() => appendDigit('0')}
-              className="flex h-11 cursor-pointer items-center justify-center rounded-xl border border-[#E5E3DD] bg-[#FAF9F7] font-mono text-base font-semibold text-[#111111] transition-colors hover:border-[#111111] hover:bg-white active:scale-95"
+              className="flex h-11 cursor-pointer items-center justify-center rounded-xl border border-[#E5E3DD] bg-[#FAF9F7] font-mono text-base font-semibold text-[#111111] transition-colors hover:border-[#E11D48] hover:bg-white hover:text-[#E11D48] active:scale-95 dark:border-[#27272F] dark:bg-[#1E1E24] dark:text-[#F4F4F6] dark:hover:bg-[#27272F]"
             >
               0
             </button>
@@ -193,7 +197,7 @@ export function PinModal({
             <button
               type="button"
               onClick={onRemovePin}
-              className="mt-3 h-9 w-full cursor-pointer rounded-lg border border-[#E5E3DD] text-xs font-medium text-[#5C5A55] transition-colors hover:border-[#E11D48] hover:text-[#E11D48]"
+              className="mt-3 h-9 w-full cursor-pointer rounded-lg border border-[#E5E3DD] text-xs font-medium text-[#5C5A55] transition-colors hover:border-[#E11D48] hover:text-[#E11D48] dark:border-[#27272F] dark:text-[#A1A1AA]"
             >
               Remove Lock PIN
             </button>
@@ -203,7 +207,7 @@ export function PinModal({
             <button
               type="button"
               onClick={onForgotReset}
-              className="mt-3 h-9 w-full cursor-pointer rounded-lg border border-[#E5E3DD] text-xs font-medium text-[#5C5A55] transition-colors hover:border-[#111111] hover:text-[#111111]"
+              className="mt-3 h-9 w-full cursor-pointer rounded-lg border border-[#E5E3DD] text-xs font-medium text-[#5C5A55] transition-colors hover:border-[#E11D48] hover:text-[#E11D48] dark:border-[#27272F] dark:text-[#A1A1AA]"
             >
               Forgot Password? Set New PIN
             </button>
@@ -213,4 +217,3 @@ export function PinModal({
     </div>
   );
 }
-

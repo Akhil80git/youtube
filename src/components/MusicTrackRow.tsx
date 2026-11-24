@@ -27,27 +27,25 @@ export function MusicTrackRow({
     <div
       className={`group flex items-center gap-3 rounded-xl border px-2.5 py-2 transition-colors sm:gap-4 sm:px-3.5 sm:py-2.5 ${
         isPlaying
-          ? 'border-[#111111] bg-white shadow-xs'
-          : 'border-[#E5E3DD] bg-white hover:border-[#111111]'
+          ? 'border-[#E11D48] bg-[#FFF1F3] shadow-xs dark:bg-[#E11D48]/15'
+          : 'border-[#E5E3DD] bg-white hover:border-[#E11D48]/60 dark:border-[#27272F] dark:bg-[#141418]'
       }`}
     >
-      {/* Optional Track Index (Desktop) */}
       {typeof index === 'number' && (
         <span
           className={`hidden w-6 shrink-0 text-center font-mono text-xs tabular-nums sm:inline-block ${
-            isPlaying ? 'font-semibold text-[#E11D48]' : 'text-[#73716C]'
+            isPlaying ? 'font-semibold text-[#E11D48]' : 'text-[#73716C] dark:text-[#A1A1AA]'
           }`}
         >
           {index + 1}
         </span>
       )}
 
-      {/* Left: Square Album/Track Thumbnail */}
       <button
         type="button"
         onClick={() => onPlay(item)}
         aria-label={`Play ${item.title}`}
-        className="relative h-14 w-14 shrink-0 cursor-pointer overflow-hidden rounded-lg bg-[#EAE7E1] sm:h-16 sm:w-16 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E11D48]"
+        className="relative h-14 w-14 shrink-0 cursor-pointer overflow-hidden rounded-lg bg-[#EAE7E1] sm:h-16 sm:w-16 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E11D48] dark:bg-[#1E1E24]"
       >
         {!imgError && item.thumbnail ? (
           <img
@@ -59,7 +57,7 @@ export function MusicTrackRow({
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-[#111111] text-white/80">
+          <div className="flex h-full w-full items-center justify-center bg-[#FFE4E8] text-[#BE123C] dark:bg-[#27272F] dark:text-white/80">
             <Disc3 className="h-5 w-5" />
           </div>
         )}
@@ -67,8 +65,8 @@ export function MusicTrackRow({
         <div
           className={`absolute inset-0 flex items-center justify-center transition-opacity ${
             isPlaying
-              ? 'bg-black/55 opacity-100'
-              : 'bg-black/45 opacity-0 group-hover:opacity-100'
+              ? 'bg-[#E11D48]/75 opacity-100'
+              : 'bg-black/40 opacity-0 group-hover:opacity-100'
           }`}
         >
           {isPlaying ? (
@@ -79,7 +77,6 @@ export function MusicTrackRow({
         </div>
       </button>
 
-      {/* Right: Track Title & Details */}
       <button
         type="button"
         onClick={() => onPlay(item)}
@@ -87,12 +84,14 @@ export function MusicTrackRow({
       >
         <div
           className={`line-clamp-1 text-sm font-semibold sm:text-[15px] ${
-            isPlaying ? 'text-[#E11D48]' : 'text-[#111111] group-hover:text-[#E11D48]'
+            isPlaying
+              ? 'text-[#BE123C] dark:text-[#FB7185]'
+              : 'text-[#111111] group-hover:text-[#E11D48] dark:text-[#F4F4F6]'
           }`}
         >
           {item.title}
         </div>
-        <div className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-[#5C5A55]">
+        <div className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-[#5C5A55] dark:text-[#A1A1AA]">
           {item.channelTitle && item.channelPath && onOpenChannel ? (
             <span
               role="link"
@@ -108,12 +107,14 @@ export function MusicTrackRow({
                   onOpenChannel(item.channelPath!);
                 }
               }}
-              className="truncate font-medium text-[#111111] hover:text-[#E11D48] hover:underline"
+              className="truncate font-medium text-[#111111] hover:text-[#E11D48] hover:underline dark:text-[#F4F4F6]"
             >
               {item.channelTitle}
             </span>
           ) : item.channelTitle ? (
-            <span className="truncate font-medium text-[#3D3C38]">{item.channelTitle}</span>
+            <span className="truncate font-medium text-[#3D3C38] dark:text-[#D4D4D8]">
+              {item.channelTitle}
+            </span>
           ) : null}
 
           {item.channelTitle && (item.viewsText || item.publishedText || item.duration) && (
@@ -127,10 +128,9 @@ export function MusicTrackRow({
         </div>
       </button>
 
-      {/* Duration & Like Action */}
       <div className="flex shrink-0 items-center gap-2">
         {item.duration && (
-          <span className="hidden font-mono text-xs tabular-nums text-[#73716C] sm:inline-block">
+          <span className="hidden font-mono text-xs tabular-nums text-[#73716C] sm:inline-block dark:text-[#A1A1AA]">
             {item.duration}
           </span>
         )}
@@ -146,7 +146,7 @@ export function MusicTrackRow({
           className={`flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg transition-colors ${
             isLiked
               ? 'text-[#E11D48]'
-              : 'text-[#73716C] hover:bg-[#FAF9F7] hover:text-[#111111]'
+              : 'text-[#73716C] hover:bg-[#FAF9F7] hover:text-[#111111] dark:text-[#A1A1AA] dark:hover:bg-[#1E1E24] dark:hover:text-white'
           }`}
         >
           <Heart className={`h-4 w-4 ${isLiked ? 'fill-current' : ''}`} />

@@ -23,8 +23,17 @@
       href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+    <script>
+      (function () {
+        try {
+          if (localStorage.getItem('yt_theme_v1') === 'dark') {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
-  <body class="bg-[#FAF9F7] text-[#111111] antialiased selection:bg-[#E11D48]/15 selection:text-[#111111]">
+  <body class="bg-[#FAF9F7] text-[#111111] antialiased selection:bg-[#E11D48]/15 selection:text-[#111111] dark:bg-[#0B0B0D] dark:text-[#F4F4F6] dark:selection:text-white">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -182,7 +182,7 @@ export function DesktopSplitPlayer({
     >
       {/* Left Half: Sticky HD Video Player + Half/Full Option */}
       <div className="lg:sticky lg:top-16 lg:col-span-7">
-        <div className="aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-sm ring-1 ring-black/10">
+        <div className="aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-sm ring-1 ring-black/10 dark:ring-white/10">
           {fallback ? (
             <iframe
               key={playingItem.id}
@@ -197,20 +197,20 @@ export function DesktopSplitPlayer({
           )}
         </div>
 
-        <div className="mt-4 rounded-2xl border border-[#E5E3DD] bg-white p-4">
+        <div className="mt-4 rounded-2xl border border-[#E5E3DD] bg-white p-4 dark:border-[#27272F] dark:bg-[#141418]">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
-              <h2 className="font-display text-lg font-bold leading-snug text-[#111111]">
+              <h2 className="font-display text-lg font-bold leading-snug text-[#111111] dark:text-[#F4F4F6]">
                 {playingItem.title}
               </h2>
               {(playingItem.channelTitle || playingItem.viewsText || playingItem.publishedText) && (
-                <p className="mt-1.5 truncate text-xs tabular-nums text-[#5C5A55]">
+                <p className="mt-1.5 truncate text-xs tabular-nums text-[#5C5A55] dark:text-[#A1A1AA]">
                   {playingItem.channelTitle && playingItem.channelPath && onOpenChannel ? (
                     <>
                       <button
                         type="button"
                         onClick={() => onOpenChannel(playingItem.channelPath!)}
-                        className="cursor-pointer font-semibold text-[#111111] hover:text-[#E11D48] hover:underline"
+                        className="cursor-pointer font-semibold text-[#111111] hover:text-[#E11D48] hover:underline dark:text-[#F4F4F6]"
                       >
                         {playingItem.channelTitle}
                       </button>
@@ -246,7 +246,7 @@ export function DesktopSplitPlayer({
                     }
                     onLockKidsScreen(Number.isFinite(sec) ? sec : 0);
                   }}
-                  className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-[#E11D48] bg-[#E11D48]/10 px-2.5 text-xs font-semibold text-[#E11D48] transition-colors hover:bg-[#E11D48] hover:text-white whitespace-nowrap"
+                  className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-[#E11D48] bg-[#FFF1F3] px-2.5 text-xs font-semibold text-[#E11D48] transition-colors hover:bg-[#E11D48] hover:text-white whitespace-nowrap dark:bg-[#E11D48]/15"
                 >
                   <Lock className="h-3.5 w-3.5" />
                   <span>Kids Lock</span>
@@ -256,12 +256,12 @@ export function DesktopSplitPlayer({
               <div
                 role="group"
                 aria-label="Player layout mode"
-                className="inline-flex shrink-0 items-center rounded-lg border border-[#E5E3DD] bg-[#F2F0EC] p-0.5"
+                className="inline-flex shrink-0 items-center rounded-lg border border-[#E5E3DD] bg-[#FAF9F7] p-0.5 dark:border-[#27272F] dark:bg-[#1E1E24]"
               >
                 <button
                   type="button"
                   aria-pressed="true"
-                  className="inline-flex h-8 cursor-default items-center gap-1.5 rounded-md bg-[#111111] px-2.5 text-xs font-medium text-white whitespace-nowrap"
+                  className="inline-flex h-8 cursor-default items-center gap-1.5 rounded-md bg-white px-2.5 text-xs font-semibold text-[#E11D48] shadow-xs whitespace-nowrap dark:bg-[#27272F] dark:text-white"
                 >
                   <Columns2 className="h-3.5 w-3.5" />
                   <span>Half</span>
@@ -269,7 +269,7 @@ export function DesktopSplitPlayer({
                 <button
                   type="button"
                   onClick={handleSwitchFull}
-                  className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-[#5C5A55] transition-colors hover:text-[#111111] whitespace-nowrap"
+                  className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-[#5C5A55] transition-colors hover:text-[#111111] whitespace-nowrap dark:text-[#A1A1AA] dark:hover:text-white"
                 >
                   <Maximize2 className="h-3.5 w-3.5" />
                   <span>Full</span>
@@ -278,13 +278,13 @@ export function DesktopSplitPlayer({
             </div>
           </div>
 
-          <div className="mt-3.5 flex items-center justify-between border-t border-[#F2F0EC] pt-3">
+          <div className="mt-3.5 flex items-center justify-between border-t border-[#F2F0EC] pt-3 dark:border-[#27272F]">
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 disabled={!hasPrev}
                 onClick={onPrev}
-                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-[#E5E3DD] bg-white px-3 text-xs font-medium text-[#111111] transition-colors hover:border-[#111111] disabled:cursor-not-allowed disabled:opacity-40 whitespace-nowrap"
+                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-[#E5E3DD] bg-white px-3 text-xs font-medium text-[#111111] transition-colors hover:border-[#E11D48] hover:text-[#E11D48] disabled:cursor-not-allowed disabled:opacity-40 whitespace-nowrap dark:border-[#27272F] dark:bg-[#1E1E24] dark:text-[#F4F4F6]"
               >
                 <SkipBack className="h-3.5 w-3.5" />
                 <span>Prev</span>
@@ -293,7 +293,7 @@ export function DesktopSplitPlayer({
                 type="button"
                 disabled={!hasNext}
                 onClick={onNext}
-                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-[#E5E3DD] bg-white px-3 text-xs font-medium text-[#111111] transition-colors hover:border-[#111111] disabled:cursor-not-allowed disabled:opacity-40 whitespace-nowrap"
+                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-[#E5E3DD] bg-white px-3 text-xs font-medium text-[#111111] transition-colors hover:border-[#E11D48] hover:text-[#E11D48] disabled:cursor-not-allowed disabled:opacity-40 whitespace-nowrap dark:border-[#27272F] dark:bg-[#1E1E24] dark:text-[#F4F4F6]"
               >
                 <span>Next</span>
                 <SkipForward className="h-3.5 w-3.5" />
@@ -308,7 +308,7 @@ export function DesktopSplitPlayer({
                 className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors whitespace-nowrap ${
                   likedActive
                     ? 'border-[#E11D48] bg-[#E11D48] text-white'
-                    : 'border-[#E5E3DD] bg-white text-[#111111] hover:border-[#111111]'
+                    : 'border-[#E5E3DD] bg-white text-[#111111] hover:border-[#E11D48] hover:text-[#E11D48] dark:border-[#27272F] dark:bg-[#1E1E24] dark:text-[#F4F4F6]'
                 }`}
               >
                 <Heart className={`h-3.5 w-3.5 ${likedActive ? 'fill-current' : ''}`} />
@@ -319,7 +319,7 @@ export function DesktopSplitPlayer({
                 type="button"
                 onClick={onClose}
                 aria-label="Close split player"
-                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-[#E5E3DD] bg-white px-3 text-xs font-medium text-[#5C5A55] transition-colors hover:border-[#111111] hover:text-[#111111] whitespace-nowrap"
+                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-[#E5E3DD] bg-white px-3 text-xs font-medium text-[#5C5A55] transition-colors hover:border-[#E11D48] hover:text-[#111111] whitespace-nowrap dark:border-[#27272F] dark:bg-[#1E1E24] dark:text-[#A1A1AA] dark:hover:text-white"
               >
                 <X className="h-3.5 w-3.5" />
                 <span>Close</span>
@@ -331,13 +331,13 @@ export function DesktopSplitPlayer({
 
       {/* Right Half: All Videos Lined Up Vertically */}
       <div className="lg:col-span-5">
-        <div className="overflow-hidden rounded-2xl border border-[#E5E3DD] bg-white">
-          <div className="flex items-center justify-between border-b border-[#E5E3DD] px-4 py-3">
+        <div className="overflow-hidden rounded-2xl border border-[#E5E3DD] bg-white dark:border-[#27272F] dark:bg-[#141418]">
+          <div className="flex items-center justify-between border-b border-[#E5E3DD] px-4 py-3 dark:border-[#27272F]">
             <div className="min-w-0">
-              <h3 className="font-display truncate text-sm font-bold text-[#111111]">
+              <h3 className="font-display truncate text-sm font-bold text-[#111111] dark:text-[#F4F4F6]">
                 {queueTitle}
               </h3>
-              <p className="font-mono text-[11px] tabular-nums text-[#73716C]">
+              <p className="font-mono text-[11px] tabular-nums text-[#73716C] dark:text-[#A1A1AA]">
                 {currentIndex >= 0
                   ? `${currentIndex + 1} / ${queue.length} videos`
                   : `${queue.length} videos`}
@@ -346,13 +346,13 @@ export function DesktopSplitPlayer({
             <button
               type="button"
               onClick={onClose}
-              className="cursor-pointer rounded-lg px-2.5 py-1 text-xs font-medium text-[#5C5A55] hover:bg-[#FAF9F7] hover:text-[#111111] whitespace-nowrap"
+              className="cursor-pointer rounded-lg px-2.5 py-1 text-xs font-medium text-[#5C5A55] hover:bg-[#FAF9F7] hover:text-[#111111] whitespace-nowrap dark:text-[#A1A1AA] dark:hover:bg-[#1E1E24] dark:hover:text-white"
             >
               Grid View
             </button>
           </div>
 
-          <div className="max-h-[calc(100vh-11rem)] divide-y divide-[#F2F0EC] overflow-y-auto">
+          <div className="max-h-[calc(100vh-11rem)] divide-y divide-[#F2F0EC] overflow-y-auto dark:divide-[#27272F]">
             {queue.map((vid, idx) => {
               const active = vid.id === playingItem.id;
               const vidLiked = isLiked(vid.id);
@@ -360,7 +360,9 @@ export function DesktopSplitPlayer({
                 <div
                   key={vid.id}
                   className={`group flex items-center gap-3 p-2.5 transition-colors ${
-                    active ? 'bg-[#FAF9F7]' : 'hover:bg-[#FAF9F7]'
+                    active
+                      ? 'bg-[#FFF1F3] dark:bg-[#E11D48]/15'
+                      : 'hover:bg-[#FAF9F7] dark:hover:bg-[#1E1E24]'
                   }`}
                 >
                   <button
@@ -370,7 +372,7 @@ export function DesktopSplitPlayer({
                   >
                     <span
                       className={`w-5 shrink-0 text-center font-mono text-[11px] tabular-nums ${
-                        active ? 'font-bold text-[#E11D48]' : 'text-[#73716C]'
+                        active ? 'font-bold text-[#E11D48]' : 'text-[#73716C] dark:text-[#A1A1AA]'
                       }`}
                     >
                       {active ? (
@@ -381,7 +383,7 @@ export function DesktopSplitPlayer({
                     </span>
 
                     <div
-                      className={`relative aspect-video w-32 shrink-0 overflow-hidden rounded-lg bg-[#EAE7E1] xl:w-36 ${
+                      className={`relative aspect-video w-32 shrink-0 overflow-hidden rounded-lg bg-[#EAE7E1] xl:w-36 dark:bg-[#1E1E24] ${
                         active ? 'ring-2 ring-[#E11D48]' : ''
                       }`}
                     >
@@ -394,18 +396,16 @@ export function DesktopSplitPlayer({
                           className="h-full w-full object-cover"
                         />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-[#111111] text-white">
+                        <div className="flex h-full w-full items-center justify-center bg-[#F2F0EC] text-[#5C5A55] dark:bg-[#1E1E24] dark:text-white">
                           <Play className="h-4 w-4" />
                         </div>
                       )}
                       {vid.duration && (
                         <span
-                          className={`absolute bottom-1 right-1 rounded px-1 py-0.5 font-mono text-[10px] font-medium tabular-nums text-white ${
-                            active
-                              ? 'bg-[#E11D48]'
-                              : vid.isLiveNow
-                                ? 'bg-[#E11D48]'
-                                : 'bg-black/80'
+                          className={`absolute bottom-1 right-1 rounded px-1 py-0.5 font-mono text-[10px] font-medium tabular-nums ${
+                            active || vid.isLiveNow
+                              ? 'bg-[#E11D48] text-white'
+                              : 'bg-white/90 text-[#111111] dark:bg-black/80 dark:text-white'
                           }`}
                         >
                           {active ? 'Playing' : vid.duration}
@@ -418,12 +418,12 @@ export function DesktopSplitPlayer({
                         className={`line-clamp-2 text-[13px] font-semibold leading-snug ${
                           active
                             ? 'text-[#E11D48]'
-                            : 'text-[#111111] group-hover:text-[#E11D48]'
+                            : 'text-[#111111] group-hover:text-[#E11D48] dark:text-[#F4F4F6]'
                         }`}
                       >
                         {vid.title}
                       </div>
-                      <div className="mt-1 truncate text-[11px] tabular-nums text-[#5C5A55]">
+                      <div className="mt-1 truncate text-[11px] tabular-nums text-[#5C5A55] dark:text-[#A1A1AA]">
                         {[vid.channelTitle, vid.viewsText, vid.publishedText]
                           .filter(Boolean)
                           .join(' · ')}
@@ -439,7 +439,7 @@ export function DesktopSplitPlayer({
                     className={`flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors ${
                       vidLiked
                         ? 'text-[#E11D48]'
-                        : 'text-[#73716C] opacity-70 hover:text-[#111111] group-hover:opacity-100'
+                        : 'text-[#73716C] opacity-70 hover:text-[#111111] group-hover:opacity-100 dark:text-[#A1A1AA] dark:hover:text-white'
                     }`}
                   >
                     <Heart className={`h-4 w-4 ${vidLiked ? 'fill-current' : ''}`} />
@@ -450,12 +450,12 @@ export function DesktopSplitPlayer({
           </div>
 
           {hasMore && onLoadMore && (
-            <div className="border-t border-[#E5E3DD] p-3">
+            <div className="border-t border-[#E5E3DD] p-3 dark:border-[#27272F]">
               <button
                 type="button"
                 disabled={loadingMore}
                 onClick={onLoadMore}
-                className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#111111] text-xs font-medium text-white transition-colors hover:bg-[#E11D48] disabled:opacity-50"
+                className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#E11D48] text-xs font-medium text-white transition-colors hover:bg-[#BE123C] disabled:opacity-50"
               >
                 {loadingMore && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 <span>{loadingMore ? 'Loading...' : 'Load More Videos'}</span>

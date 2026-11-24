@@ -121,6 +121,10 @@ export interface AppTab {
   pin?: string;
 }
 
+export type ThemeMode = 'light' | 'dark';
+
+export type ViewMode = 'explore' | 'feed' | 'search' | 'channel' | 'following' | 'liked';
+
 export interface TabDataState {
   appMode: 'videos' | 'music';
   recentChannels: RecentChannel[];
@@ -129,4 +133,3 @@ export interface TabDataState {
   followedChannels: FollowedChannel[];
   watchHistory: MediaItem[];
 }
-

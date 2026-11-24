@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BottomNav } from './components/BottomNav';
 import { ChannelView } from './components/ChannelView';
+import { EdgeSwipeBack } from './components/EdgeSwipeBack';
 import { ExploreHome } from './components/ExploreHome';
 import { FeedView } from './components/FeedView';
 import { FollowingView } from './components/FollowingView';
@@ -30,6 +31,8 @@ import type {
   RecentChannel,
   SearchVideosResponse,
   TabDataState,
+  ThemeMode,
+  ViewMode,
 } from './types';
 import { safeFetchJson } from './utils/api';
 
@@ -43,6 +46,38 @@ const TABS_STORAGE_KEY = 'yt_tabs_v1';
 const ACTIVE_TAB_STORAGE_KEY = 'yt_active_tab_id_v1';
 const HAS_VISITED_STORAGE_KEY = 'yt_has_visited_v1';
 const TAB_DATA_PREFIX = 'yt_tab_data_v1_';
+const THEME_STORAGE_KEY = 'yt_theme_v1';
+const PREFERRED_MODE_STORAGE_KEY = 'yt_preferred_mode_v1';
+
+interface ExpandedPlayerState {
+  item: MediaItem;
+  initialRotation: 0 | 90 | 180 | 270;
+  startSeconds?: number;
+  lockOnOpen?: boolean;
+}
+
+interface AppNavSnapshot {
+  seq: number;
+  hash: string;
+  tabId: string;
+  viewMode: ViewMode;
+  query: string;
+  searchQuery: string;
+  searchVideosList: MediaItem[];
+  searchChannelsList: ChannelSearchResult[];
+  searchContinuation: ContinuationInfo | null;
+  channel: ChannelInfo | null;
+  activeTab: ChannelTab;
+  items: MediaItem[];
+  playlists: PlaylistCard[];
+  about: ChannelAbout | null;
+  continuation: ContinuationInfo | null;
+  activePlaylist: PlaylistDetailResponse | null;
+  playingItem: MediaItem | null;
+  playerQueue: MediaItem[];
+  playingLikedQueue: boolean;
+  expandedPlayer: ExpandedPlayerState | null;
+}
 
 const DEFAULT_TABS: AppTab[] = [
   { id: 'main', name: 'Main', kind: 'default' },
@@ -56,9 +91,17 @@ const KIDS_DEFAULT_SEEDS = [
   'kids songs animation',
 ];
 
+function loadPreferredMode(): 'videos' | 'music' {
+  try {
+    return localStorage.getItem(PREFERRED_MODE_STORAGE_KEY) === 'music' ? 'music' : 'videos';
+  } catch {
+    return 'videos';
+  }
+}
+
 function createEmptyTabData(): TabDataState {
   return {
-    appMode: 'videos',
+    appMode: loadPreferredMode(),
     recentChannels: [],
     recentSearches: [],
     likedItems: [],
@@ -86,6 +129,14 @@ function saveStorage(key: string, value: unknown): void {
   }
 }
 
+function loadInitialTheme(): ThemeMode {
+  try {
+    return localStorage.getItem(THEME_STORAGE_KEY) === 'dark' ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
+}
+
 function loadInitialTabs(): AppTab[] {
   const stored = loadStorage<AppTab[]>(TABS_STORAGE_KEY, []);
   if (!Array.isArray(stored) || stored.length === 0) {
@@ -95,7 +146,12 @@ function loadInitialTabs(): AppTab[] {
 
   const hasMain = stored.some((t) => t.id === 'main');
   const hasKids = stored.some((t) => t.id === 'kids');
-  const normalized = [...stored];
+  // Passwords belong ONLY on the Kids tab (strip any legacy PINs from other tabs)
+  const normalized = stored.map((t) => {
+    if (t.kind === 'kids') return t;
+    const { pin: _removed, ...rest } = t;
+    return rest;
+  });
   if (!hasMain) normalized.unshift(DEFAULT_TABS[0]);
   if (!hasKids) {
     const mainIdx = normalized.findIndex((t) => t.id === 'main');
@@ -234,19 +290,32 @@ export default function App() {
     };
   });
 
-  // Tab unlock / modal states
-  const [pendingUnlockTab, setPendingUnlockTab] = useState<{
-    tab: AppTab;
-    openFeedAfter: boolean;
-  } | null>(null);
+  const [theme, setTheme] = useState<ThemeMode>(() => loadInitialTheme());
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('dark', theme === 'dark');
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // Ignore storage error
+    }
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+      meta.setAttribute('content', theme === 'dark' ? '#0B0B0D' : '#FAF9F7');
+    }
+  }, [theme]);
+
+  const [preferredMode, setPreferredMode] = useState<'videos' | 'music'>(() =>
+    loadPreferredMode()
+  );
+
+  // Modal states (password setup is Kids-only)
   const [tabModalState, setTabModalState] = useState<{
     mode: 'create' | 'edit';
     tab?: AppTab;
   } | null>(null);
-  const [passwordModalTab, setPasswordModalTab] = useState<{
-    tab: AppTab;
-    activateAfter?: boolean;
-  } | null>(null);
+  const [kidsPasswordOpen, setKidsPasswordOpen] = useState(false);
 
   const currentTab = useMemo(
     () => tabs.find((t) => t.id === activeTabId) || tabs[0] || DEFAULT_TABS[0],
@@ -258,7 +327,7 @@ export default function App() {
     [tabDataMap, activeTabId]
   );
 
-  const appMode = currentTabData.appMode;
+  const appMode = preferredMode;
   const recentChannels = currentTabData.recentChannels;
   const recentSearches = currentTabData.recentSearches;
   const likedItems = currentTabData.likedItems;
@@ -278,9 +347,7 @@ export default function App() {
   );
 
   const [query, setQuery] = useState('');
-  const [viewMode, setViewMode] = useState<
-    'explore' | 'feed' | 'search' | 'channel' | 'following' | 'liked'
-  >('explore');
+  const [viewMode, setViewMode] = useState<ViewMode>('explore');
 
   const [channel, setChannel] = useState<ChannelInfo | null>(null);
   const [activeTab, setActiveTab] = useState<ChannelTab>('videos');
@@ -304,12 +371,8 @@ export default function App() {
   const [isDesktop, setIsDesktop] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)').matches : false
   );
-  const [expandedPlayer, setExpandedPlayer] = useState<{
-    item: MediaItem;
-    initialRotation: 0 | 90 | 180 | 270;
-    startSeconds?: number;
-    lockOnOpen?: boolean;
-  } | null>(null);
+  const [expandedPlayer, setExpandedPlayer] = useState<ExpandedPlayerState | null>(null);
+  const kidsScreenLockedRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -339,6 +402,105 @@ export default function App() {
   const [loadingSearch, setLoadingSearch] = useState(false);
   const [loadingMoreSearch, setLoadingMoreSearch] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+
+  // Native Mobile Back (3-button / OS gesture) + Edge Swipe History Stack
+  const navCacheRef = useRef<Map<number, AppNavSnapshot>>(new Map());
+  const seqCounterRef = useRef(0);
+  const currentSeqRef = useRef(0);
+  const minSeqRef = useRef(0);
+  const [canGoBack, setCanGoBack] = useState(false);
+
+  const latestNavStateRef = useRef<Omit<AppNavSnapshot, 'seq'>>({
+    hash: '#',
+    tabId: activeTabId,
+    viewMode,
+    query,
+    searchQuery,
+    searchVideosList,
+    searchChannelsList,
+    searchContinuation,
+    channel,
+    activeTab,
+    items,
+    playlists,
+    about,
+    continuation,
+    activePlaylist,
+    playingItem,
+    playerQueue,
+    playingLikedQueue,
+    expandedPlayer,
+  });
+
+  latestNavStateRef.current = {
+    hash: window.location.hash || '#',
+    tabId: activeTabId,
+    viewMode,
+    query,
+    searchQuery,
+    searchVideosList,
+    searchChannelsList,
+    searchContinuation,
+    channel,
+    activeTab,
+    items,
+    playlists,
+    about,
+    continuation,
+    activePlaylist,
+    playingItem,
+    playerQueue,
+    playingLikedQueue,
+    expandedPlayer,
+  };
+
+  const storeSnapshot = useCallback(
+    (seq: number, hash: string, overrides?: Partial<Omit<AppNavSnapshot, 'seq' | 'hash'>>) => {
+      const snap: AppNavSnapshot = {
+        ...latestNavStateRef.current,
+        ...overrides,
+        seq,
+        hash,
+      };
+      navCacheRef.current.set(seq, snap);
+      if (navCacheRef.current.size > 25) {
+        for (const key of navCacheRef.current.keys()) {
+          if (key !== minSeqRef.current && key !== seq && navCacheRef.current.size > 25) {
+            navCacheRef.current.delete(key);
+          }
+        }
+      }
+      return snap;
+    },
+    []
+  );
+
+  const commitNavigation = useCallback(
+    (
+      hash: string,
+      overrides?: Partial<Omit<AppNavSnapshot, 'seq' | 'hash'>>,
+      mode: 'push' | 'replace' = 'push'
+    ) => {
+      if (mode === 'push') {
+        // Save most recent state of current entry before moving forward
+        storeSnapshot(currentSeqRef.current, latestNavStateRef.current.hash);
+        const nextSeq = seqCounterRef.current + 1;
+        seqCounterRef.current = nextSeq;
+        currentSeqRef.current = nextSeq;
+        storeSnapshot(nextSeq, hash, overrides);
+        window.history.pushState({ __ytNav: true, seq: nextSeq }, '', hash);
+        setCanGoBack(nextSeq > minSeqRef.current);
+        return nextSeq;
+      }
+
+      const seq = currentSeqRef.current;
+      storeSnapshot(seq, hash, overrides);
+      window.history.replaceState({ __ytNav: true, seq }, '', hash);
+      setCanGoBack(seq > minSeqRef.current);
+      return seq;
+    },
+    [storeSnapshot]
+  );
 
   const saveRecentSearch = useCallback(
     (term: string) => {
@@ -495,7 +657,12 @@ export default function App() {
   );
 
   const fetchChannel = useCallback(
-    async (channelInput: string, tab: ChannelTab = 'videos', isTabSwitch = false) => {
+    async (
+      channelInput: string,
+      tab: ChannelTab = 'videos',
+      isTabSwitch = false,
+      historyMode: 'push' | 'replace' = 'push'
+    ) => {
       stopLoadAllRef.current = true;
       setLoadingAll(false);
       setError(null);
@@ -529,7 +696,21 @@ export default function App() {
         setContinuation(data.continuation || null);
         saveRecentChannel(data.channel);
 
-        window.history.replaceState(null, '', `#${encodeURIComponent(data.channel.path)}`);
+        commitNavigation(
+          `#${encodeURIComponent(data.channel.path)}`,
+          {
+            viewMode: 'channel',
+            channel: data.channel,
+            activeTab: data.tab,
+            items: taggedItems,
+            playlists: data.playlists || [],
+            about: data.about || null,
+            continuation: data.continuation || null,
+            activePlaylist: null,
+            ...(isTabSwitch ? {} : { playingItem: null, expandedPlayer: null }),
+          },
+          historyMode
+        );
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unable to load channel.');
       } finally {
@@ -537,7 +718,7 @@ export default function App() {
         setLoadingTab(false);
       }
     },
-    [saveRecentChannel]
+    [commitNavigation, saveRecentChannel]
   );
 
   const loadFeedForContext = useCallback(
@@ -581,9 +762,10 @@ export default function App() {
 
   const openFeedView = useCallback(() => {
     setViewMode('feed');
-    window.history.replaceState(null, '', '#feed');
+    setExpandedPlayer(null);
+    commitNavigation('#feed', { viewMode: 'feed', expandedPlayer: null }, viewMode === 'feed' ? 'replace' : 'push');
     loadFeedForContext(currentTab, currentTabData, activeFeedSeed);
-  }, [activeFeedSeed, currentTab, currentTabData, loadFeedForContext]);
+  }, [activeFeedSeed, commitNavigation, currentTab, currentTabData, loadFeedForContext, viewMode]);
 
   const activateTab = useCallback(
     (targetTab: AppTab, openFeed = true) => {
@@ -620,14 +802,45 @@ export default function App() {
 
       if (openFeed) {
         setViewMode('feed');
-        window.history.replaceState(null, '', '#feed');
+        commitNavigation(
+          '#feed',
+          {
+            tabId: targetTab.id,
+            viewMode: 'feed',
+            query: '',
+            searchQuery: '',
+            searchVideosList: [],
+            searchChannelsList: [],
+            searchContinuation: null,
+            channel: null,
+            items: [],
+            playlists: [],
+            about: null,
+            continuation: null,
+            activePlaylist: null,
+            playingItem: null,
+            playerQueue: [],
+            playingLikedQueue: false,
+            expandedPlayer: null,
+          },
+          'push'
+        );
         loadFeedForContext(targetTab, loadedData, null);
       } else {
         setViewMode('explore');
-        window.history.replaceState(null, '', '#');
+        commitNavigation(
+          '#',
+          {
+            tabId: targetTab.id,
+            viewMode: 'explore',
+            playingItem: null,
+            expandedPlayer: null,
+          },
+          'push'
+        );
       }
     },
-    [loadFeedForContext, tabDataMap]
+    [commitNavigation, loadFeedForContext, tabDataMap]
   );
 
   const handleSelectTab = useCallback(
@@ -639,25 +852,20 @@ export default function App() {
         return;
       }
 
-      // Kids tab NEVER asks password on tab entry (only screen/rotation lock)
-      if (targetTab.kind !== 'kids' && targetTab.pin) {
-        setPendingUnlockTab({ tab: targetTab, openFeedAfter: true });
-        return;
-      }
-
       activateTab(targetTab, true);
     },
     [activeTabId, activateTab, openFeedView, viewMode]
   );
 
   const handleCreateTab = useCallback(
-    (name: string, pin?: string) => {
+    (name: string) => {
+      const clean = name.trim();
+      if (!clean) return;
       const id = `tab_${Date.now().toString(36)}`;
       const newTab: AppTab = {
         id,
-        name,
+        name: clean,
         kind: 'custom',
-        ...(pin ? { pin } : {}),
       };
       const emptyData = createEmptyTabData();
       saveStorage(`${TAB_DATA_PREFIX}${id}`, emptyData);
@@ -681,8 +889,12 @@ export default function App() {
           ...t,
           name: t.kind === 'custom' ? name : t.name,
         };
-        if (pin) {
-          updated.pin = pin;
+        if (t.kind === 'kids') {
+          if (pin) {
+            updated.pin = pin;
+          } else {
+            delete updated.pin;
+          }
         } else {
           delete updated.pin;
         }
@@ -718,18 +930,10 @@ export default function App() {
     [activeTabId, activateTab, tabs]
   );
 
-  const handleUpdateKidsPin = useCallback((pin: string) => {
-    setTabs((prev) => {
-      const next = prev.map((t) => (t.kind === 'kids' ? { ...t, pin } : t));
-      saveStorage(TABS_STORAGE_KEY, next);
-      return next;
-    });
-  }, []);
-
-  const handleSetOrResetTabPin = useCallback((tabId: string, pin?: string) => {
+  const handleUpdateKidsPin = useCallback((pin?: string) => {
     setTabs((prev) => {
       const next = prev.map((t) => {
-        if (t.id !== tabId) return t;
+        if (t.kind !== 'kids') return t;
         const updated: AppTab = { ...t };
         if (pin) {
           updated.pin = pin;
@@ -744,7 +948,11 @@ export default function App() {
   }, []);
 
   const handleSearchVideos = useCallback(
-    async (q: string, autoplayItem?: MediaItem) => {
+    async (
+      q: string,
+      autoplayItem?: MediaItem,
+      historyMode: 'push' | 'replace' = 'push'
+    ) => {
       const trimmed = q.trim();
       if (!trimmed) return;
       setViewMode('search');
@@ -752,8 +960,27 @@ export default function App() {
       setQuery(trimmed);
       setSearchError(null);
       setLoadingSearch(true);
+      setExpandedPlayer(null);
+      if (!autoplayItem) {
+        setPlayingItem(null);
+        setPlayingLikedQueue(false);
+      }
       saveRecentSearch(trimmed);
-      window.history.replaceState(null, '', `#search=${encodeURIComponent(trimmed)}`);
+
+      const searchHash = `#search=${encodeURIComponent(trimmed)}`;
+      const pushedSeq = commitNavigation(
+        searchHash,
+        {
+          viewMode: 'search',
+          searchQuery: trimmed,
+          query: trimmed,
+          expandedPlayer: null,
+          ...(autoplayItem
+            ? { playingItem: autoplayItem, playingLikedQueue: false }
+            : { playingItem: null, playingLikedQueue: false }),
+        },
+        historyMode
+      );
 
       if (autoplayItem) {
         setPlayingLikedQueue(false);
@@ -774,13 +1001,26 @@ export default function App() {
         setSearchVideosList(finalVideos);
         setSearchChannelsList([]);
         setSearchContinuation(data.continuation || null);
+
+        // Update cached snapshot with loaded results so Back restores results instantly
+        storeSnapshot(pushedSeq, searchHash, {
+          viewMode: 'search',
+          searchQuery: trimmed,
+          query: trimmed,
+          searchVideosList: finalVideos,
+          searchChannelsList: [],
+          searchContinuation: data.continuation || null,
+          ...(autoplayItem
+            ? { playingItem: autoplayItem, playerQueue: finalVideos, playingLikedQueue: false }
+            : {}),
+        });
       } catch (err) {
         setSearchError(err instanceof Error ? err.message : 'Unable to search videos.');
       } finally {
         setLoadingSearch(false);
       }
     },
-    [saveRecentSearch]
+    [commitNavigation, saveRecentSearch, storeSnapshot]
   );
 
   async function handleLoadMoreSearch() {
@@ -809,6 +1049,98 @@ export default function App() {
     }
   }
 
+  // Listen to browser/mobile Back button & OS edge-swipe gesture (popstate)
+  useEffect(() => {
+    function handlePopState(e: PopStateEvent) {
+      if (kidsScreenLockedRef.current) {
+        // Prevent bypassing Kids screen lock via mobile Back or edge swipe
+        window.history.pushState(
+          { __ytNav: true, seq: currentSeqRef.current },
+          '',
+          latestNavStateRef.current.hash
+        );
+        return;
+      }
+
+      const raw = e.state as { __ytNav?: boolean; seq?: number } | null;
+      const targetSeq = raw?.__ytNav && typeof raw.seq === 'number' ? raw.seq : undefined;
+      const snap = targetSeq !== undefined ? navCacheRef.current.get(targetSeq) : undefined;
+
+      if (snap) {
+        stopLoadAllRef.current = true;
+        setLoadingAll(false);
+        setError(null);
+        setFeedError(null);
+        setSearchError(null);
+        currentSeqRef.current = snap.seq;
+        setCanGoBack(snap.seq > minSeqRef.current);
+
+        if (snap.tabId !== activeTabId) {
+          const loaded = tabDataMap[snap.tabId] || loadTabData(snap.tabId);
+          setTabDataMap((prev) => (prev[snap.tabId] ? prev : { ...prev, [snap.tabId]: loaded }));
+          setActiveTabId(snap.tabId);
+        }
+
+        setViewMode(snap.viewMode);
+        setQuery(snap.query);
+        setSearchQuery(snap.searchQuery);
+        setSearchVideosList(snap.searchVideosList);
+        setSearchChannelsList(snap.searchChannelsList);
+        setSearchContinuation(snap.searchContinuation);
+        setChannel(snap.channel);
+        setActiveTab(snap.activeTab);
+        setItems(snap.items);
+        setPlaylists(snap.playlists);
+        setAbout(snap.about);
+        setContinuation(snap.continuation);
+        setActivePlaylist(snap.activePlaylist);
+        setPlayingItem(snap.playingItem);
+        setPlayerQueue(snap.playerQueue);
+        setPlayingLikedQueue(snap.playingLikedQueue);
+        setExpandedPlayer(snap.expandedPlayer);
+
+        if (snap.viewMode === 'feed' && feedItems.length === 0) {
+          const targetTabObj = tabs.find((t) => t.id === snap.tabId) || currentTab;
+          const targetDataObj = tabDataMap[snap.tabId] || loadTabData(snap.tabId);
+          loadFeedForContext(targetTabObj, targetDataObj, null);
+        }
+        return;
+      }
+
+      // Fallback if external hash state popped
+      const hash = window.location.hash.replace(/^#/, '');
+      const decoded = hash ? decodeURIComponent(hash) : '';
+      setExpandedPlayer(null);
+      setPlayingItem(null);
+      if (decoded === 'feed') {
+        setViewMode('feed');
+      } else if (decoded === 'liked') {
+        setViewMode('liked');
+      } else if (decoded === 'following') {
+        setViewMode('following');
+      } else if (decoded.startsWith('search=')) {
+        const sq = decoded.slice('search='.length).trim();
+        if (sq) handleSearchVideos(sq, undefined, 'replace');
+      } else if (decoded.trim()) {
+        fetchChannel(decoded, 'videos', false, 'replace');
+      } else {
+        setViewMode('explore');
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [
+    activeTabId,
+    currentTab,
+    feedItems.length,
+    fetchChannel,
+    handleSearchVideos,
+    loadFeedForContext,
+    tabDataMap,
+    tabs,
+  ]);
+
   // First visit -> Home only. Returning visits -> restore most recent tab & open its Feed directly!
   useEffect(() => {
     const hash = window.location.hash.replace(/^#/, '');
@@ -827,39 +1159,36 @@ export default function App() {
     if (decoded && decoded !== 'feed') {
       if (decoded === 'liked') {
         setViewMode('liked');
+        commitNavigation('#liked', { viewMode: 'liked' }, 'replace');
         return;
       }
       if (decoded === 'following') {
         setViewMode('following');
+        commitNavigation('#following', { viewMode: 'following' }, 'replace');
         return;
       }
       if (decoded.startsWith('search=')) {
         const sq = decoded.slice('search='.length).trim();
         if (sq) {
-          handleSearchVideos(sq);
+          handleSearchVideos(sq, undefined, 'replace');
           return;
         }
       } else if (decoded.trim()) {
-        fetchChannel(decoded, 'videos', false);
+        fetchChannel(decoded, 'videos', false, 'replace');
         return;
       }
     }
 
     if (!hasVisitedBefore && decoded !== 'feed') {
       setViewMode('explore');
+      commitNavigation('#', { viewMode: 'explore' }, 'replace');
       return;
     }
 
     // Returning visitor: restore most recent tab and go straight to its Feed
-    const recentTab = currentTab;
-    if (recentTab.kind !== 'kids' && recentTab.pin) {
-      setPendingUnlockTab({ tab: recentTab, openFeedAfter: true });
-      return;
-    }
-
     setViewMode('feed');
-    window.history.replaceState(null, '', '#feed');
-    loadFeedForContext(recentTab, currentTabData, null);
+    commitNavigation('#feed', { viewMode: 'feed' }, 'replace');
+    loadFeedForContext(currentTab, currentTabData, null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -957,7 +1286,13 @@ export default function App() {
         ...v,
         channelTitle: v.channelTitle || data.author || channel?.title,
       }));
-      setActivePlaylist({ ...data, videos: taggedVideos });
+      const nextPlaylist = { ...data, videos: taggedVideos };
+      setActivePlaylist(nextPlaylist);
+      commitNavigation(
+        latestNavStateRef.current.hash,
+        { activePlaylist: nextPlaylist },
+        'push'
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load playlist.');
     } finally {
@@ -966,14 +1301,22 @@ export default function App() {
   }
 
   function handlePlayItem(item: MediaItem, customQueue?: MediaItem[]) {
+    const queue = customQueue || items;
+    const wasPlaying = Boolean(playingItem);
     setPlayingLikedQueue(false);
     setPlayerStartSeconds(0);
     setPlayingItem(item);
-    setPlayerQueue(customQueue || items);
+    setPlayerQueue(queue);
     recordWatch(item);
+    commitNavigation(
+      latestNavStateRef.current.hash,
+      { playingItem: item, playerQueue: queue, playingLikedQueue: false },
+      wasPlaying ? 'replace' : 'push'
+    );
   }
 
   function handlePlayLikedTrack(item: MediaItem, shuffle = false) {
+    const wasPlaying = Boolean(playingItem);
     setPlayingLikedQueue(true);
     setAutoPlayNext(true);
     setLoopQueue(true);
@@ -982,6 +1325,57 @@ export default function App() {
     setPlayingItem(item);
     setPlayerQueue(likedItems);
     recordWatch(item);
+    commitNavigation(
+      latestNavStateRef.current.hash,
+      { playingItem: item, playerQueue: likedItems, playingLikedQueue: true },
+      wasPlaying ? 'replace' : 'push'
+    );
+  }
+
+  function openExpandedPlayer(
+    item: MediaItem,
+    initialRotation: 0 | 90 | 180 | 270,
+    startSeconds?: number,
+    lockOnOpen?: boolean
+  ) {
+    const nextExpanded: ExpandedPlayerState = {
+      item,
+      initialRotation,
+      startSeconds,
+      lockOnOpen,
+    };
+    const wasExpanded = Boolean(expandedPlayer);
+    setExpandedPlayer(nextExpanded);
+    commitNavigation(
+      latestNavStateRef.current.hash,
+      { expandedPlayer: nextExpanded },
+      wasExpanded ? 'replace' : 'push'
+    );
+  }
+
+  function closeExpandedPlayer() {
+    const hadExpanded = Boolean(
+      navCacheRef.current.get(currentSeqRef.current)?.expandedPlayer
+    );
+    setExpandedPlayer(null);
+    if (hadExpanded && currentSeqRef.current > minSeqRef.current) {
+      window.history.back();
+    }
+  }
+
+  function handleStopPlay() {
+    const curSnap = navCacheRef.current.get(currentSeqRef.current);
+    const prevSnap = navCacheRef.current.get(currentSeqRef.current - 1);
+    setPlayingItem(null);
+    if (
+      curSnap?.playingItem &&
+      prevSnap &&
+      !prevSnap.playingItem &&
+      prevSnap.viewMode === curSnap.viewMode &&
+      currentSeqRef.current > minSeqRef.current
+    ) {
+      window.history.back();
+    }
   }
 
   const activeQueue = playerQueue.length > 0 ? playerQueue : items;
@@ -1046,6 +1440,12 @@ export default function App() {
 
   function handleChangeMode(nextMode: 'videos' | 'music') {
     if (nextMode === appMode) return;
+    setPreferredMode(nextMode);
+    try {
+      localStorage.setItem(PREFERRED_MODE_STORAGE_KEY, nextMode);
+    } catch {
+      // Ignore storage error
+    }
     updateTabData(activeTabId, (prev) => ({ ...prev, appMode: nextMode }));
     setExpandedPlayer(null);
     if (nextMode === 'videos') {
@@ -1069,13 +1469,29 @@ export default function App() {
     setExpandedPlayer(null);
     setQuery('');
     setError(null);
-    window.history.replaceState(null, '', '#');
+    commitNavigation(
+      '#',
+      {
+        viewMode: 'explore',
+        channel: null,
+        items: [],
+        playlists: [],
+        about: null,
+        continuation: null,
+        activePlaylist: null,
+        playingItem: appMode !== 'music' ? null : playingItem,
+        expandedPlayer: null,
+        query: '',
+      },
+      viewMode === 'explore' ? 'replace' : 'push'
+    );
   }
 
   const isKidsTab = currentTab.kind === 'kids';
+  const kidsTab = useMemo(() => tabs.find((t) => t.kind === 'kids') || DEFAULT_TABS[1], [tabs]);
 
   return (
-    <div className="min-h-screen bg-[#FAF9F7] text-[#111111]">
+    <div className="min-h-screen bg-[#FAF9F7] text-[#111111] transition-colors dark:bg-[#0B0B0D] dark:text-[#F4F4F6]">
       <LaptopSidebar
         appMode={appMode}
         activeView={viewMode}
@@ -1084,18 +1500,29 @@ export default function App() {
         activeChannelPath={channel?.path}
         tabs={tabs}
         activeTabId={activeTabId}
+        theme={theme}
+        onChangeTheme={setTheme}
         onSelectTab={handleSelectTab}
         onEditTab={(tab) => setTabModalState({ mode: 'edit', tab })}
+        onOpenKidsPassword={() => setKidsPasswordOpen(true)}
         onCreateTab={() => setTabModalState({ mode: 'create' })}
         onResetHome={handleResetHome}
         onOpenFeed={openFeedView}
         onOpenFollowing={() => {
           setViewMode('following');
-          window.history.replaceState(null, '', '#following');
+          commitNavigation(
+            '#following',
+            { viewMode: 'following' },
+            viewMode === 'following' ? 'replace' : 'push'
+          );
         }}
         onOpenLiked={() => {
           setViewMode('liked');
-          window.history.replaceState(null, '', '#liked');
+          commitNavigation(
+            '#liked',
+            { viewMode: 'liked' },
+            viewMode === 'liked' ? 'replace' : 'push'
+          );
         }}
         onChangeMode={handleChangeMode}
         onOpenChannel={(path) => fetchChannel(path, 'videos', false)}
@@ -1104,12 +1531,9 @@ export default function App() {
       <TopNav
         query={query}
         loading={loadingChannel || loadingSearch}
-        likedCount={likedItems.length}
         followedCount={followedChannels.length}
         activeView={viewMode}
         recentSearches={recentSearches}
-        hasActivePin={Boolean(currentTab.pin)}
-        isKidsTab={isKidsTab}
         onSubmitSearch={(input) => handleSearchVideos(input)}
         onSelectVideoFromDropdown={(video, suggestions, qText) => {
           recordWatch(video);
@@ -1120,16 +1544,13 @@ export default function App() {
         }}
         onRemoveRecentSearch={handleRemoveRecentSearch}
         onClearRecentSearches={handleClearRecentSearches}
-        onOpenPasswordManager={() =>
-          setPasswordModalTab({ tab: currentTab, activateAfter: false })
-        }
         onOpenFollowing={() => {
           setViewMode('following');
-          window.history.replaceState(null, '', '#following');
-        }}
-        onOpenLiked={() => {
-          setViewMode('liked');
-          window.history.replaceState(null, '', '#liked');
+          commitNavigation(
+            '#following',
+            { viewMode: 'following' },
+            viewMode === 'following' ? 'replace' : 'push'
+          );
         }}
         onResetHome={handleResetHome}
       />
@@ -1143,16 +1564,19 @@ export default function App() {
           kidsPin={isKidsTab ? currentTab.pin : undefined}
           initialLocked={expandedPlayer.lockOnOpen}
           onSaveKidsPin={handleUpdateKidsPin}
+          onLockChange={(locked) => {
+            kidsScreenLockedRef.current = locked;
+          }}
           onSwitchHalf={
             isDesktop
               ? (sec) => {
                   setPlayerStartSeconds(sec);
-                  setExpandedPlayer(null);
+                  closeExpandedPlayer();
                 }
               : undefined
           }
           onEnded={() => advanceToNext(false)}
-          onClose={() => setExpandedPlayer(null)}
+          onClose={closeExpandedPlayer}
         />
       )}
 
@@ -1170,33 +1594,16 @@ export default function App() {
           onToggleLike={handleToggleLike}
           onToggleShuffle={() => setShuffleQueue((v) => !v)}
           onToggleLoop={() => setLoopQueue((v) => !v)}
-          onClose={() => setPlayingItem(null)}
+          onClose={handleStopPlay}
         />
       )}
 
-      {(() => {
-        const isStartupLocked = Boolean(
-          pendingUnlockTab &&
-            pendingUnlockTab.tab.id === activeTabId &&
-            currentTab.kind !== 'kids' &&
-            currentTab.pin
-        );
-        if (isStartupLocked) {
-          return (
-            <div className="flex min-h-[60vh] items-center justify-center px-4 text-center lg:pl-60 xl:pl-64">
-              <p className="text-sm text-[#5C5A55]">
-                Enter PIN to unlock &ldquo;{currentTab.name}&rdquo; tab.
-              </p>
-            </div>
-          );
-        }
-        return (
-          <div className="lg:pl-60 xl:pl-64">
+      <div className="lg:pl-60 xl:pl-64">
         {error && viewMode === 'channel' && channel && (
           <div className="mx-auto max-w-[1440px] px-3 pt-4 sm:px-6">
             <div
               role="alert"
-              className="rounded-xl border border-[#E11D48]/30 bg-[#E11D48]/5 px-4 py-3 text-sm text-[#BE123C]"
+              className="rounded-xl border border-[#E11D48]/30 bg-[#E11D48]/5 px-4 py-3 text-sm text-[#BE123C] dark:bg-[#E11D48]/10 dark:text-[#FDA4AF]"
             >
               {error}
             </div>
@@ -1220,27 +1627,16 @@ export default function App() {
             hasPrev={hasPrev}
             hasNext={hasNext}
             hasExpandedPlayer={Boolean(expandedPlayer)}
-            hasChannelOpen={Boolean(channel)}
             isLiked={isLiked}
             onPlayItem={handlePlayItem}
-            onStopPlay={() => setPlayingItem(null)}
+            onStopPlay={handleStopPlay}
             onPrev={goPrev}
             onNext={() => advanceToNext(true)}
             onEnded={() => advanceToNext(false)}
-            onExpandFull={(item, initialRotation, sec, lockOnOpen) =>
-              setExpandedPlayer({ item, initialRotation, startSeconds: sec, lockOnOpen })
-            }
+            onExpandFull={openExpandedPlayer}
             onToggleLike={handleToggleLike}
             onOpenChannel={(path) => fetchChannel(path, 'videos', false)}
             onLoadMore={handleLoadMoreSearch}
-            onBack={() => {
-              if (channel) {
-                setViewMode('channel');
-                window.history.replaceState(null, '', `#${encodeURIComponent(channel.path)}`);
-              } else {
-                handleResetHome();
-              }
-            }}
           />
         ) : viewMode === 'feed' ? (
           <FeedView
@@ -1259,7 +1655,6 @@ export default function App() {
             hasPrev={hasPrev}
             hasNext={hasNext}
             hasExpandedPlayer={Boolean(expandedPlayer)}
-            hasChannelOpen={Boolean(channel)}
             isLiked={isLiked}
             onSelectSeed={(seed) => {
               setActiveFeedSeed(seed);
@@ -1267,38 +1662,19 @@ export default function App() {
             }}
             onRefresh={() => loadFeed(activeFeedSeed)}
             onPlayItem={handlePlayItem}
-            onStopPlay={() => setPlayingItem(null)}
+            onStopPlay={handleStopPlay}
             onPrev={goPrev}
             onNext={() => advanceToNext(true)}
             onEnded={() => advanceToNext(false)}
-            onExpandFull={(item, initialRotation, sec, lockOnOpen) =>
-              setExpandedPlayer({ item, initialRotation, startSeconds: sec, lockOnOpen })
-            }
+            onExpandFull={openExpandedPlayer}
             onToggleLike={handleToggleLike}
             onOpenChannel={(path) => fetchChannel(path, 'videos', false)}
-            onBack={() => {
-              if (channel) {
-                setViewMode('channel');
-                window.history.replaceState(null, '', `#${encodeURIComponent(channel.path)}`);
-              } else {
-                handleResetHome();
-              }
-            }}
           />
         ) : viewMode === 'following' ? (
           <FollowingView
             followedChannels={followedChannels}
-            hasChannelOpen={Boolean(channel)}
             onOpenChannel={(path) => fetchChannel(path, 'videos', false)}
             onUnfollow={handleUnfollow}
-            onBack={() => {
-              if (channel) {
-                setViewMode('channel');
-                window.history.replaceState(null, '', `#${encodeURIComponent(channel.path)}`);
-              } else {
-                handleResetHome();
-              }
-            }}
           />
         ) : viewMode === 'liked' ? (
           <LikedPlaylistView
@@ -1313,27 +1689,16 @@ export default function App() {
             hasExpandedPlayer={Boolean(expandedPlayer)}
             autoPlayNext={autoPlayNext}
             loopQueue={loopQueue}
-            hasChannelOpen={Boolean(channel)}
             onPlayTrack={handlePlayLikedTrack}
-            onStopPlay={() => setPlayingItem(null)}
+            onStopPlay={handleStopPlay}
             onPrev={goPrev}
             onNext={() => advanceToNext(true)}
             onEnded={() => advanceToNext(false)}
-            onExpandFull={(item, initialRotation, sec, lockOnOpen) =>
-              setExpandedPlayer({ item, initialRotation, startSeconds: sec, lockOnOpen })
-            }
+            onExpandFull={openExpandedPlayer}
             onToggleAutoPlay={() => setAutoPlayNext((v) => !v)}
             onToggleLoop={() => setLoopQueue((v) => !v)}
             onToggleLike={handleToggleLike}
             onClearAll={handleClearLiked}
-            onBack={() => {
-              if (channel) {
-                setViewMode('channel');
-                window.history.replaceState(null, '', `#${encodeURIComponent(channel.path)}`);
-              } else {
-                handleResetHome();
-              }
-            }}
           />
         ) : viewMode === 'channel' && channel ? (
           <ChannelView
@@ -1363,22 +1728,28 @@ export default function App() {
             isLiked={isLiked}
             onToggleFollow={handleToggleFollow}
             onToggleLike={handleToggleLike}
-            onChangeTab={(tab) => fetchChannel(channel.path, tab, true)}
+            onChangeTab={(tab) => fetchChannel(channel.path, tab, true, 'replace')}
             onLoadMore={handleLoadMore}
             onLoadAll={handleLoadAll}
             onStopLoadAll={() => {
               stopLoadAllRef.current = true;
             }}
             onPlayItem={handlePlayItem}
-            onStopPlay={() => setPlayingItem(null)}
+            onStopPlay={handleStopPlay}
             onPrev={goPrev}
             onNext={() => advanceToNext(true)}
             onEnded={() => advanceToNext(false)}
-            onExpandFull={(item, initialRotation, sec, lockOnOpen) =>
-              setExpandedPlayer({ item, initialRotation, startSeconds: sec, lockOnOpen })
-            }
+            onExpandFull={openExpandedPlayer}
             onOpenPlaylist={handleOpenPlaylist}
-            onClosePlaylist={() => setActivePlaylist(null)}
+            onClosePlaylist={() => {
+              const hadPlaylist = Boolean(
+                navCacheRef.current.get(currentSeqRef.current)?.activePlaylist
+              );
+              setActivePlaylist(null);
+              if (hadPlaylist && currentSeqRef.current > minSeqRef.current) {
+                window.history.back();
+              }
+            }}
           />
         ) : (
           <ExploreHome
@@ -1392,107 +1763,62 @@ export default function App() {
             onSubmitChannel={(input) => fetchChannel(input, 'videos', false)}
             onOpenFollowing={() => {
               setViewMode('following');
-              window.history.replaceState(null, '', '#following');
+              commitNavigation('#following', { viewMode: 'following' }, 'push');
             }}
             onOpenLiked={() => {
               setViewMode('liked');
-              window.history.replaceState(null, '', '#liked');
+              commitNavigation('#liked', { viewMode: 'liked' }, 'push');
             }}
             onPlayLikedAll={() => {
               if (likedItems[0]) {
                 setViewMode('liked');
+                commitNavigation('#liked', { viewMode: 'liked' }, 'push');
                 handlePlayLikedTrack(likedItems[0], false);
               }
             }}
           />
         )}
-          </div>
-        );
-      })()}
+      </div>
 
       <BottomNav
         tabs={tabs}
-        activeTabId={activeTabId}
+        activeTab={currentTab}
         activeView={viewMode}
+        appMode={appMode}
+        likedCount={likedItems.length}
+        theme={theme}
+        onChangeMode={handleChangeMode}
+        onChangeTheme={setTheme}
         onOpenFeed={openFeedView}
+        onOpenLiked={() => {
+          setViewMode('liked');
+          commitNavigation(
+            '#liked',
+            { viewMode: 'liked' },
+            viewMode === 'liked' ? 'replace' : 'push'
+          );
+        }}
         onSelectTab={handleSelectTab}
+        onCreateTabInline={handleCreateTab}
         onEditTab={(tab) => setTabModalState({ mode: 'edit', tab })}
-        onCreateTab={() => setTabModalState({ mode: 'create' })}
+        onOpenKidsPassword={() => setKidsPasswordOpen(true)}
       />
 
-      {pendingUnlockTab && (
-        <PinModal
-          mode="verify"
-          title={`Unlock "${pendingUnlockTab.tab.name}" Tab`}
-          subtitle="Enter 1–4 digit PIN to open this tab"
-          expectedPin={pendingUnlockTab.tab.pin}
-          allowForgotReset={true}
-          onForgotReset={() => {
-            const target = pendingUnlockTab;
-            setPendingUnlockTab(null);
-            setPasswordModalTab({ tab: target.tab, activateAfter: true });
-          }}
-          onSuccess={() => {
-            const target = pendingUnlockTab;
-            setPendingUnlockTab(null);
-            activateTab(target.tab, target.openFeedAfter);
-          }}
-          onCancel={() => {
-            setPendingUnlockTab(null);
-            // If locked on startup before switching, fall back safely to Kids or an unlocked tab
-            if (activeTabId === pendingUnlockTab.tab.id && currentTab.pin && currentTab.kind !== 'kids') {
-              const unlockedTab =
-                tabs.find((t) => t.kind === 'kids' || !t.pin) || DEFAULT_TABS[1];
-              activateTab(unlockedTab, true);
-            }
-          }}
-        />
-      )}
-
-      {passwordModalTab && (
+      {kidsPasswordOpen && (
         <PinModal
           mode="setup"
-          title={
-            passwordModalTab.tab.kind === 'kids'
-              ? 'Kids Screen Lock PIN'
-              : `New PIN for "${passwordModalTab.tab.name}"`
-          }
-          subtitle={
-            passwordModalTab.tab.kind === 'kids'
-              ? 'Set or change 1–4 digit PIN beforehand (locks video touches)'
-              : 'Forgot old PIN? Just enter any new 1–4 digit PIN anytime'
-          }
-          canRemove={Boolean(passwordModalTab.tab.pin)}
+          title="Kids Screen Lock PIN"
+          subtitle="Set or change 1–4 digit PIN for Kids video screen lock"
+          canRemove={Boolean(kidsTab.pin)}
           onSuccess={(newPin) => {
-            const { tab, activateAfter } = passwordModalTab;
-            handleSetOrResetTabPin(tab.id, newPin);
-            setPasswordModalTab(null);
-            if (activateAfter) {
-              activateTab({ ...tab, pin: newPin }, true);
-            }
+            handleUpdateKidsPin(newPin);
+            setKidsPasswordOpen(false);
           }}
           onRemovePin={() => {
-            const { tab, activateAfter } = passwordModalTab;
-            handleSetOrResetTabPin(tab.id, undefined);
-            setPasswordModalTab(null);
-            if (activateAfter) {
-              activateTab({ ...tab, pin: undefined }, true);
-            }
+            handleUpdateKidsPin(undefined);
+            setKidsPasswordOpen(false);
           }}
-          onCancel={() => {
-            const wasStartupLocked = Boolean(
-              passwordModalTab.activateAfter &&
-                activeTabId === passwordModalTab.tab.id &&
-                currentTab.pin &&
-                currentTab.kind !== 'kids'
-            );
-            setPasswordModalTab(null);
-            if (wasStartupLocked) {
-              const unlockedTab =
-                tabs.find((t) => t.kind === 'kids' || !t.pin) || DEFAULT_TABS[1];
-              activateTab(unlockedTab, true);
-            }
-          }}
+          onCancel={() => setKidsPasswordOpen(false)}
         />
       )}
 
@@ -1506,6 +1832,11 @@ export default function App() {
           onClose={() => setTabModalState(null)}
         />
       )}
+
+      <EdgeSwipeBack
+        enabled={canGoBack && !(isKidsTab && Boolean(expandedPlayer) && kidsScreenLockedRef.current)}
+        onSwipeBack={() => window.history.back()}
+      />
 
       <OfflineIndicator />
     </div>

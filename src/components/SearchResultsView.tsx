@@ -1,4 +1,4 @@
-import { ArrowLeft, Loader2, Play, Search } from 'lucide-react';
+import { Loader2, Play, Search } from 'lucide-react';
 import type { ChannelSearchResult, MediaItem } from '../types';
 import { DesktopSplitPlayer } from './DesktopSplitPlayer';
 import { MediaCard } from './MediaCard';
@@ -20,7 +20,6 @@ interface SearchResultsViewProps {
   hasPrev: boolean;
   hasNext: boolean;
   hasExpandedPlayer: boolean;
-  hasChannelOpen: boolean;
   isLiked: (id: string) => boolean;
   onPlayItem: (item: MediaItem, queue: MediaItem[]) => void;
   onStopPlay: () => void;
@@ -36,7 +35,6 @@ interface SearchResultsViewProps {
   onToggleLike: (item: MediaItem) => void;
   onOpenChannel: (path: string) => void;
   onLoadMore: () => void;
-  onBack: () => void;
 }
 
 export function SearchResultsView({
@@ -55,7 +53,6 @@ export function SearchResultsView({
   hasPrev,
   hasNext,
   hasExpandedPlayer,
-  hasChannelOpen,
   isLiked,
   onPlayItem,
   onStopPlay,
@@ -66,28 +63,19 @@ export function SearchResultsView({
   onToggleLike,
   onOpenChannel,
   onLoadMore,
-  onBack,
 }: SearchResultsViewProps) {
   const splitActive =
     isDesktop && appMode === 'videos' && Boolean(playingItem) && !hasExpandedPlayer;
 
   return (
     <main className="mx-auto max-w-[1440px] px-3 pb-36 pt-5 sm:px-6 sm:pt-6 lg:pb-24">
-      <div className="flex flex-col gap-4 border-b border-[#E5E3DD] pb-5 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-4 border-b border-[#E5E3DD] pb-5 sm:flex-row sm:items-end sm:justify-between dark:border-[#27272F]">
         <div>
-          <button
-            type="button"
-            onClick={onBack}
-            className="mb-3 inline-flex min-h-[36px] cursor-pointer items-center gap-1.5 text-xs font-medium text-[#5C5A55] hover:text-[#111111]"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            <span>{hasChannelOpen ? 'Back to Channel' : 'Back to Home'}</span>
-          </button>
 
-          <h1 className="font-display text-2xl font-bold tracking-tight text-[#111111] sm:text-3xl">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-[#111111] sm:text-3xl dark:text-[#F4F4F6]">
             {searchQuery ? `Results for “${searchQuery}”` : 'Search Videos & Songs'}
           </h1>
-          <p className="mt-1 text-sm tabular-nums text-[#5C5A55]">
+          <p className="mt-1 text-sm tabular-nums text-[#5C5A55] dark:text-[#A1A1AA]">
             {loading
               ? 'Finding videos and songs...'
               : `${videos.length} ${videos.length === 1 ? 'video' : 'videos'} loaded`}
@@ -109,7 +97,7 @@ export function SearchResultsView({
       {error && (
         <div
           role="alert"
-          className="mt-5 rounded-xl border border-[#E11D48]/30 bg-[#E11D48]/5 px-4 py-3 text-sm text-[#BE123C]"
+          className="mt-5 rounded-xl border border-[#E11D48]/30 bg-[#E11D48]/5 px-4 py-3 text-sm text-[#BE123C] dark:text-[#FB7185]"
         >
           {error}
         </div>
@@ -119,17 +107,17 @@ export function SearchResultsView({
         <div className="mt-6 grid grid-cols-1 gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="animate-pulse space-y-2.5">
-              <div className="aspect-video w-full rounded-xl bg-[#EAE7E1]" />
-              <div className="h-4 w-5/6 rounded bg-[#EAE7E1]" />
-              <div className="h-3 w-1/2 rounded bg-[#EAE7E1]" />
+              <div className="aspect-video w-full rounded-xl bg-[#EAE7E1] dark:bg-[#1E1E24]" />
+              <div className="h-4 w-5/6 rounded bg-[#EAE7E1] dark:bg-[#1E1E24]" />
+              <div className="h-3 w-1/2 rounded bg-[#EAE7E1] dark:bg-[#1E1E24]" />
             </div>
           ))}
         </div>
       ) : (
         <>
           {channels.length > 0 && (
-            <section className="mt-5 border-b border-[#E5E3DD] pb-5">
-              <h2 className="font-display text-xs font-semibold tracking-wide text-[#5C5A55]">
+            <section className="mt-5 border-b border-[#E5E3DD] pb-5 dark:border-[#27272F]">
+              <h2 className="font-display text-xs font-semibold tracking-wide text-[#5C5A55] dark:text-[#A1A1AA]">
                 Matching Channels
               </h2>
               <div className="mt-2.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
@@ -138,25 +126,25 @@ export function SearchResultsView({
                     key={ch.id}
                     type="button"
                     onClick={() => onOpenChannel(ch.path)}
-                    className="flex min-h-[56px] cursor-pointer items-center gap-3 rounded-xl border border-[#E5E3DD] bg-white p-3 text-left transition-colors hover:border-[#111111]"
+                    className="flex min-h-[56px] cursor-pointer items-center gap-3 rounded-xl border border-[#E5E3DD] bg-white p-3 text-left transition-colors hover:border-[#E11D48] dark:border-[#27272F] dark:bg-[#141418]"
                   >
                     {ch.avatar ? (
                       <img
                         src={ch.avatar}
                         alt=""
                         referrerPolicy="no-referrer"
-                        className="h-9 w-9 shrink-0 rounded-full bg-[#F2F0EC] object-cover"
+                        className="h-9 w-9 shrink-0 rounded-full bg-[#F2F0EC] object-cover dark:bg-[#1E1E24]"
                       />
                     ) : (
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#111111] font-display text-xs font-bold text-white">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FFE4E8] font-display text-xs font-bold text-[#BE123C] dark:bg-[#27272F] dark:text-white">
                         {ch.title.charAt(0).toUpperCase()}
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-[#111111]">
+                      <div className="truncate text-sm font-semibold text-[#111111] dark:text-[#F4F4F6]">
                         {ch.title}
                       </div>
-                      <div className="truncate text-xs text-[#73716C]">
+                      <div className="truncate text-xs text-[#73716C] dark:text-[#A1A1AA]">
                         {[ch.handle, ch.subscribersText].filter(Boolean).join(' · ')}
                       </div>
                     </div>
@@ -167,14 +155,14 @@ export function SearchResultsView({
           )}
 
           {videos.length === 0 ? (
-            <div className="mx-auto mt-14 max-w-md rounded-2xl border border-[#E5E3DD] bg-white p-8 text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#FAF9F7] text-[#111111]">
+            <div className="mx-auto mt-14 max-w-md rounded-2xl border border-[#E5E3DD] bg-white p-8 text-center dark:border-[#27272F] dark:bg-[#141418]">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#FFF1F3] text-[#E11D48] dark:bg-[#27272F]">
                 <Search className="h-5 w-5" />
               </div>
-              <h2 className="font-display text-lg font-semibold text-[#111111]">
+              <h2 className="font-display text-lg font-semibold text-[#111111] dark:text-[#F4F4F6]">
                 No videos found
               </h2>
-              <p className="mt-2 text-sm leading-relaxed text-[#5C5A55]">
+              <p className="mt-2 text-sm leading-relaxed text-[#5C5A55] dark:text-[#A1A1AA]">
                 Try another song name, topic, or channel title in the top search bar.
               </p>
             </div>
@@ -242,15 +230,15 @@ export function SearchResultsView({
               )}
 
               {hasMore && !splitActive && (
-                <div className="mt-10 flex items-center justify-between border-t border-[#E5E3DD] pt-6">
-                  <p className="text-xs tabular-nums text-[#5C5A55]">
+                <div className="mt-10 flex items-center justify-between border-t border-[#E5E3DD] pt-6 dark:border-[#27272F]">
+                  <p className="text-xs tabular-nums text-[#5C5A55] dark:text-[#A1A1AA]">
                     Showing {videos.length} results
                   </p>
                   <button
                     type="button"
                     disabled={loadingMore}
                     onClick={onLoadMore}
-                    className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#111111] px-5 text-sm font-medium text-white transition-colors hover:bg-[#E11D48] disabled:opacity-50"
+                    className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#E11D48] px-5 text-sm font-medium text-white transition-colors hover:bg-[#BE123C] disabled:opacity-50"
                   >
                     {loadingMore && <Loader2 className="h-4 w-4 animate-spin" />}
                     <span>{loadingMore ? 'Loading...' : 'Load More Videos'}</span>
