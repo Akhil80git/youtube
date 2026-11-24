@@ -1,23 +1,94 @@
-import type {
-  ChannelAbout,
-  ChannelInfo,
-  ChannelSearchResult,
-  ChannelTab,
-  ChannelTabResponse,
-  ContinuationInfo,
-  MediaItem,
-  PlaylistCard,
-  PlaylistDetailResponse,
-} from '../src/types.ts';
+import express, { type NextFunction, type Request, type Response } from 'express';
+
+type ChannelTab = 'videos' | 'shorts' | 'live' | 'playlists' | 'about';
+
+interface ChannelInfo {
+  id: string;
+  title: string;
+  handle: string;
+  path: string;
+  url: string;
+  avatar: string;
+  banner: string;
+  subscribersText: string;
+  videoCountText: string;
+  description: string;
+  availableTabs: ChannelTab[];
+}
+
+interface MediaItem {
+  id: string;
+  title: string;
+  thumbnail: string;
+  duration: string;
+  viewsText: string;
+  publishedText: string;
+  type: 'video' | 'short' | 'live';
+  isLiveNow?: boolean;
+  channelTitle?: string;
+  channelPath?: string;
+}
+
+interface PlaylistCard {
+  id: string;
+  title: string;
+  thumbnail: string;
+  videoCountText: string;
+  updatedText: string;
+}
+
+interface ChannelAbout {
+  description: string;
+  country: string;
+  joinedDateText: string;
+  viewCountText: string;
+  subscriberCountText: string;
+  videoCountText: string;
+  links: { title: string; url: string }[];
+}
+
+interface ContinuationInfo {
+  token: string;
+  apiKey: string;
+  clientVersion: string;
+}
+
+interface ChannelSearchResult {
+  id: string;
+  title: string;
+  handle: string;
+  path: string;
+  avatar: string;
+  subscribersText: string;
+  description: string;
+}
 
 const YOUTUBE_ORIGIN = 'https://www.youtube.com';
 const ALLOWED_HOSTS = new Set(['www.youtube.com', 'youtube.com', 'm.youtube.com']);
+const DEFAULT_CLIENT_VERSION = '2.20261123.00.00';
 
-const REQUEST_HEADERS: Record<string, string> = {
+const HTML_HEADERS: Record<string, string> = {
   'User-Agent':
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
   'Accept-Language': 'en-US,en;q=0.9',
   Cookie: 'SOCS=CAI',
+};
+
+const INNERTUBE_HEADERS: Record<string, string> = {
+  'Content-Type': 'application/json',
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  'Accept-Language': 'en-US,en;q=0.9',
+  Origin: YOUTUBE_ORIGIN,
+  Referer: `${YOUTUBE_ORIGIN}/`,
+  Cookie: 'SOCS=CAI',
+};
+
+const TAB_DEFAULT_PARAMS: Record<Exclude<ChannelTab, 'about'>, string> = {
+  videos: 'EgZ2aWRlb3PyBgQKAjoA',
+  shorts: 'EgZzaG9ydHPyBgUKA5oBAA%3D%3D',
+  live: 'EgdzdHJlYW1z8gYECgJ6AA%3D%3D',
+  playlists: 'EglwbGF5bGlzdHPyBgoKCEIGCgIQaCIA',
 };
 
 function sanitizeImageUrl(url: unknown): string {
@@ -73,10 +144,39 @@ function readText(node: unknown): string {
   return '';
 }
 
+async function callInnerTube(
+  endpoint: string,
+  payload: Record<string, unknown>,
+  apiKey = '',
+  clientVersion = DEFAULT_CLIENT_VERSION
+): Promise<any> {
+  const qs = apiKey ? `?key=${encodeURIComponent(apiKey)}` : '?prettyPrint=false';
+  const res = await fetch(`${YOUTUBE_ORIGIN}/youtubei/v1/${endpoint}${qs}`, {
+    method: 'POST',
+    headers: INNERTUBE_HEADERS,
+    body: JSON.stringify({
+      context: {
+        client: {
+          clientName: 'WEB',
+          clientVersion: clientVersion || DEFAULT_CLIENT_VERSION,
+          hl: 'en',
+          gl: 'US',
+        },
+      },
+      ...payload,
+    }),
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!res.ok) {
+    throw new Error(`YouTube API returned status ${res.status}`);
+  }
+  return res.json();
+}
+
 async function fetchYoutubeHtml(pathAndQuery: string): Promise<string> {
   const url = `${YOUTUBE_ORIGIN}${pathAndQuery}`;
   const res = await fetch(url, {
-    headers: REQUEST_HEADERS,
+    headers: HTML_HEADERS,
     signal: AbortSignal.timeout(12000),
     redirect: 'follow',
   });
@@ -107,7 +207,7 @@ function extractYtData(html: string): {
   }
 
   let apiKey = '';
-  let clientVersion = '2.20261123.00.00';
+  let clientVersion = DEFAULT_CLIENT_VERSION;
   const cfgMatch = html.match(/ytcfg\.set\((\{[\s\S]*?\})\);/);
   if (cfgMatch) {
     try {
@@ -124,7 +224,7 @@ function extractYtData(html: string): {
   return { data, apiKey, clientVersion };
 }
 
-export async function resolveChannelPath(rawQuery: string): Promise<string> {
+function normalizeCandidatePath(rawQuery: string): { path: string; browseId?: string; isNameQuery?: boolean } {
   const q = rawQuery.trim();
   if (!q) {
     throw new Error('Please enter a channel name, @handle, or YouTube URL.');
@@ -149,18 +249,18 @@ export async function resolveChannelPath(rawQuery: string): Promise<string> {
     if (segments[0].startsWith('@')) {
       const handle = segments[0].replace(/[^a-zA-Z0-9._@-]/g, '');
       if (handle.length < 2) throw new Error('Invalid channel handle.');
-      return `/${handle}`;
+      return { path: `/${handle}` };
     }
     if (segments[0] === 'channel' && segments[1] && /^UC[a-zA-Z0-9_-]{18,32}$/.test(segments[1])) {
-      return `/channel/${segments[1]}`;
+      return { path: `/channel/${segments[1]}`, browseId: segments[1] };
     }
     if ((segments[0] === 'c' || segments[0] === 'user') && segments[1]) {
       const cleanName = segments[1].replace(/[^a-zA-Z0-9._-]/g, '');
-      if (cleanName) return `/${segments[0]}/${cleanName}`;
+      if (cleanName) return { path: `/${segments[0]}/${cleanName}` };
     }
     const legacy = segments[0].replace(/[^a-zA-Z0-9._-]/g, '');
     if (legacy && !['watch', 'shorts', 'playlist', 'results', 'feed'].includes(legacy.toLowerCase())) {
-      return `/@${legacy}`;
+      return { path: `/@${legacy}` };
     }
     throw new Error('Could not detect a channel from that URL. Try a channel URL like youtube.com/@Fireship.');
   }
@@ -168,33 +268,68 @@ export async function resolveChannelPath(rawQuery: string): Promise<string> {
   if (q.startsWith('@')) {
     const cleanHandle = q.replace(/[^a-zA-Z0-9._@-]/g, '');
     if (cleanHandle.length < 2) throw new Error('Invalid channel handle.');
-    return `/${cleanHandle}`;
+    return { path: `/${cleanHandle}` };
   }
 
   if (/^UC[a-zA-Z0-9_-]{20,30}$/.test(q)) {
-    return `/channel/${q}`;
+    return { path: `/channel/${q}`, browseId: q };
   }
 
-  const results = await searchChannels(q);
-  if (results.length > 0) {
-    return results[0].path;
-  }
-
-  const handleGuess = q.replace(/[^a-zA-Z0-9._-]/g, '');
-  if (handleGuess.length >= 2) {
-    return `/@${handleGuess}`;
-  }
-  throw new Error(`No channel found matching "${q}".`);
+  return { path: '', isNameQuery: true };
 }
 
-export async function searchChannels(query: string): Promise<ChannelSearchResult[]> {
+async function resolveChannelTarget(rawQuery: string): Promise<{ path: string; browseId: string }> {
+  const norm = normalizeCandidatePath(rawQuery);
+  if (norm.browseId) {
+    return { path: norm.path, browseId: norm.browseId };
+  }
+
+  if (norm.isNameQuery) {
+    const results = await searchChannels(rawQuery);
+    if (results.length > 0) {
+      const first = results[0];
+      const id = /^UC[a-zA-Z0-9_-]{18,32}$/.test(first.id) ? first.id : '';
+      return { path: first.path, browseId: id };
+    }
+    const handleGuess = rawQuery.trim().replace(/[^a-zA-Z0-9._-]/g, '');
+    if (handleGuess.length >= 2) {
+      norm.path = `/@${handleGuess}`;
+    } else {
+      throw new Error(`No channel found matching "${rawQuery}".`);
+    }
+  }
+
+  try {
+    const resolved = await callInnerTube('navigation/resolve_url', {
+      url: `${YOUTUBE_ORIGIN}${norm.path}`,
+    });
+    const browseId = resolved?.endpoint?.browseEndpoint?.browseId;
+    if (typeof browseId === 'string' && /^UC[a-zA-Z0-9_-]{18,32}$/.test(browseId)) {
+      return { path: norm.path, browseId };
+    }
+  } catch {
+    // Fallback to HTML path below
+  }
+
+  return { path: norm.path, browseId: '' };
+}
+
+async function searchChannels(query: string): Promise<ChannelSearchResult[]> {
   const trimmed = query.trim();
   if (!trimmed || trimmed.length > 100) return [];
 
-  const html = await fetchYoutubeHtml(
-    `/results?search_query=${encodeURIComponent(trimmed)}&sp=EgIQAg%3D%3D`
-  );
-  const { data } = extractYtData(html);
+  let data: Record<string, unknown>;
+  try {
+    data = await callInnerTube('search', {
+      query: trimmed,
+      params: 'EgIQAg%3D%3D',
+    });
+  } catch {
+    const html = await fetchYoutubeHtml(
+      `/results?search_query=${encodeURIComponent(trimmed)}&sp=EgIQAg%3D%3D`
+    );
+    data = extractYtData(html).data;
+  }
 
   const sections =
     (data.contents as any)?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer
@@ -629,43 +764,12 @@ function parseAboutInfo(data: Record<string, unknown>, channel: ChannelInfo): Ch
   };
 }
 
-export async function fetchChannelTab(
-  rawQuery: string,
-  tab: ChannelTab
-): Promise<ChannelTabResponse> {
-  const channelPath = await resolveChannelPath(rawQuery);
-  const suffixMap: Record<ChannelTab, string> = {
-    videos: '/videos',
-    shorts: '/shorts',
-    live: '/streams',
-    playlists: '/playlists',
-    about: '/about',
-  };
-
-  const html = await fetchYoutubeHtml(`${channelPath}${suffixMap[tab]}`);
-  const { data, apiKey, clientVersion } = extractYtData(html);
-
-  const channel = parseChannelInfo(data, channelPath);
-  const tabs = (data.contents as any)?.twoColumnBrowseResultsRenderer?.tabs || [];
-  const selectedTab = tabs.find((t: any) => t?.tabRenderer?.selected)?.tabRenderer;
-  const tabContent = selectedTab?.content;
-
-  if (tab === 'about') {
-    const about = parseAboutInfo(data, channel);
-    return {
-      channel,
-      tab,
-      items: [],
-      playlists: [],
-      about,
-      continuation: null,
-    };
-  }
-
-  let rawList: any[] = [];
+function collectRawTabList(tabContent: any): any[] {
+  const rawList: any[] = [];
   if (tabContent?.richGridRenderer?.contents) {
-    rawList = tabContent.richGridRenderer.contents;
-  } else if (tabContent?.sectionListRenderer?.contents) {
+    return tabContent.richGridRenderer.contents;
+  }
+  if (tabContent?.sectionListRenderer?.contents) {
     for (const sec of tabContent.sectionListRenderer.contents) {
       const innerContents = sec?.itemSectionRenderer?.contents || [];
       for (const inner of innerContents) {
@@ -682,7 +786,95 @@ export async function fetchChannelTab(
       }
     }
   }
+  return rawList;
+}
 
+async function fetchChannelTab(rawQuery: string, tab: ChannelTab) {
+  const target = await resolveChannelTarget(rawQuery);
+  const suffixMap: Record<ChannelTab, string> = {
+    videos: '/videos',
+    shorts: '/shorts',
+    live: '/streams',
+    playlists: '/playlists',
+    about: '/about',
+  };
+
+  let data: Record<string, unknown> | null = null;
+  let apiKey = '';
+  let clientVersion = DEFAULT_CLIENT_VERSION;
+
+  if (tab !== 'about' && target.browseId) {
+    try {
+      const defaultParam = TAB_DEFAULT_PARAMS[tab];
+      let resData = await callInnerTube('browse', {
+        browseId: target.browseId,
+        params: defaultParam,
+      });
+
+      const tabs = (resData?.contents as any)?.twoColumnBrowseResultsRenderer?.tabs || [];
+      const wantedTitle = tab.toLowerCase();
+      const matchedTab = tabs.find(
+        (t: any) => (t?.tabRenderer?.title || '').toLowerCase() === wantedTitle
+      )?.tabRenderer;
+
+      const selectedTab = tabs.find((t: any) => t?.tabRenderer?.selected)?.tabRenderer;
+      if (
+        matchedTab &&
+        (!selectedTab || (selectedTab.title || '').toLowerCase() !== wantedTitle) &&
+        matchedTab.endpoint?.browseEndpoint?.params
+      ) {
+        resData = await callInnerTube('browse', {
+          browseId: target.browseId,
+          params: matchedTab.endpoint.browseEndpoint.params,
+        });
+      }
+
+      data = resData;
+    } catch {
+      data = null;
+    }
+  }
+
+  if (!data) {
+    try {
+      const htmlPath = target.path || `/channel/${target.browseId}`;
+      const html = await fetchYoutubeHtml(`${htmlPath}${suffixMap[tab]}`);
+      const extracted = extractYtData(html);
+      data = extracted.data;
+      apiKey = extracted.apiKey;
+      clientVersion = extracted.clientVersion;
+    } catch (htmlErr) {
+      if (tab === 'about' && target.browseId) {
+        data = await callInnerTube('browse', { browseId: target.browseId });
+      } else {
+        throw htmlErr;
+      }
+    }
+  }
+
+  if (!data) {
+    throw new Error('Unable to load channel data.');
+  }
+
+  const fallbackPath = target.path || `/channel/${target.browseId}`;
+  const channel = parseChannelInfo(data, fallbackPath);
+  const tabs = (data.contents as any)?.twoColumnBrowseResultsRenderer?.tabs || [];
+  const selectedTab = tabs.find((t: any) => t?.tabRenderer?.selected)?.tabRenderer;
+  const tabContent = selectedTab?.content;
+
+  if (tab === 'about') {
+    const about = parseAboutInfo(data, channel);
+    return {
+      channel,
+      tab,
+      items: [],
+      playlists: [],
+      about,
+      continuation: null,
+    };
+  }
+
+  const rawList = collectRawTabList(tabContent);
   const { items, playlists, nextToken } = extractItemsAndContinuation(rawList, tab);
 
   return {
@@ -691,54 +883,23 @@ export async function fetchChannelTab(
     items,
     playlists,
     about: null,
-    continuation: nextToken && apiKey ? { token: nextToken, apiKey, clientVersion } : null,
+    continuation: nextToken ? { token: nextToken, apiKey, clientVersion } : null,
   };
 }
 
-export async function fetchChannelContinuation(
-  continuation: ContinuationInfo,
-  tab: ChannelTab
-): Promise<{
-  items: MediaItem[];
-  playlists: PlaylistCard[];
-  continuation: ContinuationInfo | null;
-}> {
+async function fetchChannelContinuation(continuation: ContinuationInfo, tab: ChannelTab) {
   const { token, apiKey, clientVersion } = continuation;
-  if (!/^[a-zA-Z0-9_-]{10,80}$/.test(apiKey)) {
+  if (apiKey && !/^[a-zA-Z0-9_-]{10,80}$/.test(apiKey)) {
     throw new Error('Invalid continuation key.');
   }
-  if (!/^[0-9.]{3,32}$/.test(clientVersion)) {
+  if (clientVersion && !/^[0-9.]{3,32}$/.test(clientVersion)) {
     throw new Error('Invalid client version.');
   }
   if (!token || token.length > 4096) {
     throw new Error('Invalid continuation token.');
   }
 
-  const res = await fetch(`${YOUTUBE_ORIGIN}/youtubei/v1/browse?key=${encodeURIComponent(apiKey)}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...REQUEST_HEADERS,
-    },
-    body: JSON.stringify({
-      context: {
-        client: {
-          clientName: 'WEB',
-          clientVersion,
-          hl: 'en',
-          gl: 'US',
-        },
-      },
-      continuation: token,
-    }),
-    signal: AbortSignal.timeout(12000),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Failed to load more items (${res.status}).`);
-  }
-
-  const json = (await res.json()) as any;
+  const json = await callInnerTube('browse', { continuation: token }, apiKey, clientVersion);
   const actions = json?.onResponseReceivedActions || json?.onResponseReceivedEndpoints || [];
   const rawList: any[] = [];
   for (const act of actions) {
@@ -755,20 +916,33 @@ export async function fetchChannelContinuation(
   return {
     items,
     playlists,
-    continuation: nextToken ? { token: nextToken, apiKey, clientVersion } : null,
+    continuation: nextToken
+      ? { token: nextToken, apiKey, clientVersion: clientVersion || DEFAULT_CLIENT_VERSION }
+      : null,
   };
 }
 
-export async function fetchPlaylistDetail(listId: string): Promise<PlaylistDetailResponse> {
+async function fetchPlaylistDetail(listId: string) {
   if (!/^[a-zA-Z0-9_-]{10,64}$/.test(listId)) {
     throw new Error('Invalid playlist ID.');
   }
 
-  const html = await fetchYoutubeHtml(`/playlist?list=${encodeURIComponent(listId)}`);
-  const { data, apiKey, clientVersion } = extractYtData(html);
+  let data: Record<string, unknown> | null = null;
+  let apiKey = '';
+  let clientVersion = DEFAULT_CLIENT_VERSION;
 
-  const header = (data.header as any)?.playlistHeaderRenderer;
-  const pageHeader = (data.header as any)?.pageHeaderRenderer;
+  try {
+    const html = await fetchYoutubeHtml(`/playlist?list=${encodeURIComponent(listId)}`);
+    const extracted = extractYtData(html);
+    data = extracted.data;
+    apiKey = extracted.apiKey;
+    clientVersion = extracted.clientVersion;
+  } catch {
+    data = await callInnerTube('browse', { browseId: `VL${listId}` });
+  }
+
+  const header = (data?.header as any)?.playlistHeaderRenderer;
+  const pageHeader = (data?.header as any)?.pageHeaderRenderer;
 
   let title = 'Playlist';
   let author = '';
@@ -801,7 +975,7 @@ export async function fetchPlaylistDetail(listId: string): Promise<PlaylistDetai
   }
 
   const sectionContents =
-    (data.contents as any)?.twoColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer?.content
+    (data?.contents as any)?.twoColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer?.content
       ?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents || [];
 
   const listContents: any[] = [];
@@ -823,18 +997,26 @@ export async function fetchPlaylistDetail(listId: string): Promise<PlaylistDetai
     viewsText,
     description,
     videos: items,
-    continuation: nextToken && apiKey ? { token: nextToken, apiKey, clientVersion } : null,
+    continuation: nextToken ? { token: nextToken, apiKey, clientVersion } : null,
   };
 }
 
-export async function searchVideos(query: string, limit = 20): Promise<MediaItem[]> {
+async function searchVideos(query: string, limit = 20): Promise<MediaItem[]> {
   const trimmed = query.trim();
   if (!trimmed || trimmed.length > 100) return [];
 
-  const html = await fetchYoutubeHtml(
-    `/results?search_query=${encodeURIComponent(trimmed)}&sp=EgIQAQ%3D%3D`
-  );
-  const { data } = extractYtData(html);
+  let data: Record<string, unknown>;
+  try {
+    data = await callInnerTube('search', {
+      query: trimmed,
+      params: 'EgIQAQ%3D%3D',
+    });
+  } catch {
+    const html = await fetchYoutubeHtml(
+      `/results?search_query=${encodeURIComponent(trimmed)}&sp=EgIQAQ%3D%3D`
+    );
+    data = extractYtData(html).data;
+  }
 
   const sections =
     (data.contents as any)?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer
@@ -858,20 +1040,31 @@ export async function searchVideos(query: string, limit = 20): Promise<MediaItem
   return results;
 }
 
-export async function searchAllVideos(
-  query: string,
-  includeChannels = true
-): Promise<import('../src/types.ts').SearchVideosResponse> {
+async function searchAllVideos(query: string, includeChannels = true) {
   const trimmed = query.trim();
   if (!trimmed || trimmed.length > 100) {
     return { query: trimmed, videos: [], channels: [], continuation: null };
   }
 
   const videoPromise = (async () => {
-    const html = await fetchYoutubeHtml(
-      `/results?search_query=${encodeURIComponent(trimmed)}&sp=EgIQAQ%3D%3D`
-    );
-    const { data, apiKey, clientVersion } = extractYtData(html);
+    let data: Record<string, unknown>;
+    let apiKey = '';
+    let clientVersion = DEFAULT_CLIENT_VERSION;
+
+    try {
+      data = await callInnerTube('search', {
+        query: trimmed,
+        params: 'EgIQAQ%3D%3D',
+      });
+    } catch {
+      const html = await fetchYoutubeHtml(
+        `/results?search_query=${encodeURIComponent(trimmed)}&sp=EgIQAQ%3D%3D`
+      );
+      const extracted = extractYtData(html);
+      data = extracted.data;
+      apiKey = extracted.apiKey;
+      clientVersion = extracted.clientVersion;
+    }
 
     const sections =
       (data.contents as any)?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer
@@ -900,7 +1093,7 @@ export async function searchAllVideos(
 
     return {
       videos,
-      continuation: nextToken && apiKey ? { token: nextToken, apiKey, clientVersion } : null,
+      continuation: nextToken ? { token: nextToken, apiKey, clientVersion } : null,
     };
   })();
 
@@ -918,51 +1111,19 @@ export async function searchAllVideos(
   };
 }
 
-export async function fetchSearchContinuation(
-  continuation: ContinuationInfo
-): Promise<{
-  videos: MediaItem[];
-  continuation: ContinuationInfo | null;
-}> {
+async function fetchSearchContinuation(continuation: ContinuationInfo) {
   const { token, apiKey, clientVersion } = continuation;
-  if (!/^[a-zA-Z0-9_-]{10,80}$/.test(apiKey)) {
+  if (apiKey && !/^[a-zA-Z0-9_-]{10,80}$/.test(apiKey)) {
     throw new Error('Invalid continuation key.');
   }
-  if (!/^[0-9.]{3,32}$/.test(clientVersion)) {
+  if (clientVersion && !/^[0-9.]{3,32}$/.test(clientVersion)) {
     throw new Error('Invalid client version.');
   }
   if (!token || token.length > 4096) {
     throw new Error('Invalid continuation token.');
   }
 
-  const res = await fetch(
-    `${YOUTUBE_ORIGIN}/youtubei/v1/search?key=${encodeURIComponent(apiKey)}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...REQUEST_HEADERS,
-      },
-      body: JSON.stringify({
-        context: {
-          client: {
-            clientName: 'WEB',
-            clientVersion,
-            hl: 'en',
-            gl: 'US',
-          },
-        },
-        continuation: token,
-      }),
-      signal: AbortSignal.timeout(12000),
-    }
-  );
-
-  if (!res.ok) {
-    throw new Error(`Failed to load more results (${res.status}).`);
-  }
-
-  const json = (await res.json()) as any;
+  const json = await callInnerTube('search', { continuation: token }, apiKey, clientVersion);
   const cmds = json?.onResponseReceivedCommands || json?.onResponseReceivedActions || [];
 
   const videos: MediaItem[] = [];
@@ -990,7 +1151,9 @@ export async function fetchSearchContinuation(
 
   return {
     videos,
-    continuation: nextToken ? { token: nextToken, apiKey, clientVersion } : null,
+    continuation: nextToken
+      ? { token: nextToken, apiKey, clientVersion: clientVersion || DEFAULT_CLIENT_VERSION }
+      : null,
   };
 }
 
@@ -1001,10 +1164,7 @@ const DEFAULT_FEED_SEEDS = [
   'live acoustic music session',
 ];
 
-export async function fetchPersonalizedFeed(
-  rawSeeds: string[],
-  excludeIds: Set<string>
-): Promise<{ items: MediaItem[]; seedsUsed: string[] }> {
+async function fetchPersonalizedFeed(rawSeeds: string[], excludeIds: Set<string>) {
   const cleanedSeeds = rawSeeds
     .map((s) => s.trim().slice(0, 80))
     .filter((s) => s.length >= 2);
@@ -1035,3 +1195,190 @@ export async function fetchPersonalizedFeed(
   return { items: merged, seedsUsed };
 }
 
+const VALID_TABS = new Set<ChannelTab>(['videos', 'shorts', 'live', 'playlists', 'about']);
+
+const apiApp = express();
+apiApp.use(express.json({ limit: '64kb' }));
+
+apiApp.use((req: Request, _res: Response, next: NextFunction) => {
+  const vpath = req.query.__vpath;
+  if (typeof vpath === 'string' && vpath.trim()) {
+    const cleanSubpath = vpath.replace(/^\/+/, '');
+    const params = new URLSearchParams();
+    for (const [k, val] of Object.entries(req.query)) {
+      if (k === '__vpath') continue;
+      if (Array.isArray(val)) {
+        for (const item of val) params.append(k, String(item));
+      } else if (val !== undefined) {
+        params.append(k, String(val));
+      }
+    }
+    const qs = params.toString();
+    req.url = `/api/${cleanSubpath}${qs ? `?${qs}` : ''}`;
+  }
+  next();
+});
+
+apiApp.get('/api/health', (_req: Request, res: Response) => {
+  res.json({ ok: true });
+});
+
+apiApp.get('/api/search-channels', async (req: Request, res: Response) => {
+  try {
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    if (!q) {
+      return res.json({ results: [] });
+    }
+    if (q.length > 100) {
+      return res.status(400).json({ error: 'Search query is too long.' });
+    }
+    const results = await searchChannels(q);
+    return res.json({ results });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to search channels.';
+    return res.status(500).json({ error: message });
+  }
+});
+
+apiApp.get('/api/search-videos', async (req: Request, res: Response) => {
+  try {
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const includeChannels = req.query.channels !== '0';
+    if (!q) {
+      return res.json({ query: '', videos: [], channels: [], continuation: null });
+    }
+    if (q.length > 100) {
+      return res.status(400).json({ error: 'Search query is too long.' });
+    }
+    const data = await searchAllVideos(q, includeChannels);
+    return res.json(data);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to search videos.';
+    return res.status(500).json({ error: message });
+  }
+});
+
+apiApp.post('/api/search-videos/more', async (req: Request, res: Response) => {
+  try {
+    const { continuation } = req.body ?? {};
+    if (
+      !continuation ||
+      typeof continuation.token !== 'string' ||
+      (continuation.apiKey !== undefined && typeof continuation.apiKey !== 'string') ||
+      (continuation.clientVersion !== undefined && typeof continuation.clientVersion !== 'string')
+    ) {
+      return res.status(400).json({ error: 'Missing pagination parameters.' });
+    }
+    const data = await fetchSearchContinuation({
+      token: continuation.token,
+      apiKey: continuation.apiKey || '',
+      clientVersion: continuation.clientVersion || DEFAULT_CLIENT_VERSION,
+    });
+    return res.json(data);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unable to load more results.';
+    return res.status(400).json({ error: message });
+  }
+});
+
+apiApp.get('/api/channel', async (req: Request, res: Response) => {
+  try {
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const rawTab = typeof req.query.tab === 'string' ? req.query.tab.toLowerCase() : 'videos';
+    const tab: ChannelTab = VALID_TABS.has(rawTab as ChannelTab)
+      ? (rawTab as ChannelTab)
+      : 'videos';
+
+    if (!q) {
+      return res.status(400).json({ error: 'Please enter a channel name, @handle, or URL.' });
+    }
+    if (q.length > 300) {
+      return res.status(400).json({ error: 'Channel query is too long.' });
+    }
+
+    const data = await fetchChannelTab(q, tab);
+    return res.json(data);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unable to load channel.';
+    return res.status(400).json({ error: message });
+  }
+});
+
+apiApp.post('/api/channel/more', async (req: Request, res: Response) => {
+  try {
+    const { continuation, tab } = req.body ?? {};
+    const safeTab: ChannelTab = VALID_TABS.has(tab) ? tab : 'videos';
+    if (
+      !continuation ||
+      typeof continuation.token !== 'string' ||
+      (continuation.apiKey !== undefined && typeof continuation.apiKey !== 'string') ||
+      (continuation.clientVersion !== undefined && typeof continuation.clientVersion !== 'string')
+    ) {
+      return res.status(400).json({ error: 'Missing pagination parameters.' });
+    }
+
+    const data = await fetchChannelContinuation(
+      {
+        token: continuation.token,
+        apiKey: continuation.apiKey || '',
+        clientVersion: continuation.clientVersion || DEFAULT_CLIENT_VERSION,
+      },
+      safeTab
+    );
+    return res.json(data);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unable to load more videos.';
+    return res.status(400).json({ error: message });
+  }
+});
+
+apiApp.get('/api/playlist', async (req: Request, res: Response) => {
+  try {
+    const listId = typeof req.query.list === 'string' ? req.query.list.trim() : '';
+    if (!listId) {
+      return res.status(400).json({ error: 'Missing playlist ID.' });
+    }
+    const data = await fetchPlaylistDetail(listId);
+    return res.json(data);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unable to load playlist.';
+    return res.status(400).json({ error: message });
+  }
+});
+
+apiApp.get('/api/feed', async (req: Request, res: Response) => {
+  try {
+    const rawSeeds = typeof req.query.seeds === 'string' ? req.query.seeds : '';
+    const rawExclude = typeof req.query.exclude === 'string' ? req.query.exclude : '';
+
+    const seeds = rawSeeds
+      .split('||')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 5);
+
+    const excludeIds = new Set(
+      rawExclude
+        .split(',')
+        .map((id) => id.trim())
+        .filter((id) => /^[a-zA-Z0-9_-]{11}$/.test(id))
+    );
+
+    const data = await fetchPersonalizedFeed(seeds, excludeIds);
+    return res.json(data);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unable to load feed.';
+    return res.status(500).json({ error: message });
+  }
+});
+
+apiApp.use('/api', (_req: Request, res: Response) => {
+  res.status(404).json({ error: 'API endpoint not found.' });
+});
+
+apiApp.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  const message = err instanceof Error ? err.message : 'Internal server error.';
+  res.status(500).json({ error: message });
+});
+
+export default apiApp;

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { MediaItem, SearchVideosResponse } from '../types';
+import { safeFetchJson } from '../utils/api';
 
 interface TopNavProps {
   query: string;
@@ -78,14 +79,11 @@ export function TopNav({
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await fetch(
+        const data = await safeFetchJson<SearchVideosResponse>(
           `/api/search-videos?q=${encodeURIComponent(trimmed)}&channels=0`,
           { signal: controller.signal }
         );
-        if (res.ok) {
-          const data = (await res.json()) as SearchVideosResponse;
-          setVideoSuggestions((data.videos || []).slice(0, 8));
-        }
+        setVideoSuggestions((data.videos || []).slice(0, 8));
       } catch {
         // Ignore aborted or network search errors in autocomplete
       } finally {
