@@ -255,10 +255,10 @@ export function MusicPlayerBar({
         <div ref={hostRef} className="h-full w-full" />
       </div>
 
-      {/* Spotify-style Fixed Bottom Audio Bar */}
+      {/* Spotify-style Fixed Bottom Audio Bar (sits above BottomNav on mobile/tablet) */}
       <aside
         aria-label="Music player"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#111111]/95 text-white backdrop-blur-md lg:left-60 xl:left-64"
+        className="fixed inset-x-0 bottom-11 z-40 border-t border-white/10 bg-[#111111]/95 text-white backdrop-blur-md lg:bottom-0 lg:left-60 xl:left-64"
       >
         {/* Interactive Top Progress Strip */}
         <div
@@ -277,7 +277,7 @@ export function MusicPlayerBar({
           />
         </div>
 
-        <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-3 px-3 sm:px-6">
+        <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between gap-3 px-3 sm:px-6">
           {/* Left: Square Album Art + Track Details */}
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="h-11 w-11 shrink-0 overflow-hidden rounded-md bg-white/10">

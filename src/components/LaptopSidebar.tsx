@@ -1,5 +1,18 @@
-import { Compass, Film, Heart, Home, Music, Play, Users } from 'lucide-react';
-import type { FollowedChannel } from '../types';
+import {
+  Baby,
+  Compass,
+  Film,
+  Heart,
+  Home,
+  Lock,
+  Music,
+  Play,
+  Plus,
+  Settings2,
+  ShieldCheck,
+  Users,
+} from 'lucide-react';
+import type { AppTab, FollowedChannel } from '../types';
 import { PWAInstallButton } from './PWAInstallButton';
 
 interface LaptopSidebarProps {
@@ -8,6 +21,11 @@ interface LaptopSidebarProps {
   likedCount: number;
   followedChannels: FollowedChannel[];
   activeChannelPath?: string;
+  tabs: AppTab[];
+  activeTabId: string;
+  onSelectTab: (tab: AppTab) => void;
+  onEditTab: (tab: AppTab) => void;
+  onCreateTab: () => void;
   onResetHome: () => void;
   onOpenFeed: () => void;
   onOpenFollowing: () => void;
@@ -22,6 +40,11 @@ export function LaptopSidebar({
   likedCount,
   followedChannels,
   activeChannelPath,
+  tabs,
+  activeTabId,
+  onSelectTab,
+  onEditTab,
+  onCreateTab,
   onResetHome,
   onOpenFeed,
   onOpenFollowing,
@@ -35,7 +58,7 @@ export function LaptopSidebar({
       className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-60 xl:w-64 lg:flex-col lg:border-r lg:border-[#E5E3DD] lg:bg-white"
     >
       {/* Brand Mark */}
-      <div className="flex h-16 shrink-0 items-center border-b border-[#F2F0EC] px-5">
+      <div className="flex h-12 shrink-0 items-center border-b border-[#F2F0EC] px-5">
         <button
           type="button"
           onClick={onResetHome}
@@ -87,141 +110,206 @@ export function LaptopSidebar({
         </div>
       </div>
 
-      {/* Primary Vertical Nav Items */}
-      <nav aria-label="Main sections" className="space-y-1 px-3 py-3">
-        <button
-          type="button"
-          onClick={onResetHome}
-          className={`flex h-10 w-full cursor-pointer items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors whitespace-nowrap ${
-            activeView === 'explore'
-              ? 'bg-[#111111] text-white'
-              : 'text-[#5C5A55] hover:bg-[#FAF9F7] hover:text-[#111111]'
-          }`}
-        >
-          <Home className="h-4 w-4 shrink-0" />
-          <span>Home</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={onOpenFeed}
-          className={`flex h-10 w-full cursor-pointer items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors whitespace-nowrap ${
-            activeView === 'feed'
-              ? 'bg-[#111111] text-white'
-              : 'text-[#5C5A55] hover:bg-[#FAF9F7] hover:text-[#111111]'
-          }`}
-        >
-          <Compass className="h-4 w-4 shrink-0" />
-          <span>For You Feed</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={onOpenFollowing}
-          className={`flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-xl px-3 text-sm font-medium transition-colors whitespace-nowrap ${
-            activeView === 'following'
-              ? 'bg-[#111111] text-white'
-              : 'text-[#5C5A55] hover:bg-[#FAF9F7] hover:text-[#111111]'
-          }`}
-        >
-          <span className="flex items-center gap-3">
-            <Users className="h-4 w-4 shrink-0" />
-            <span>Following</span>
-          </span>
-          {followedChannels.length > 0 && (
-            <span
-              className={`font-mono text-xs tabular-nums ${
-                activeView === 'following' ? 'text-white/80' : 'text-[#73716C]'
-              }`}
-            >
-              {followedChannels.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={onOpenLiked}
-          className={`flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-xl px-3 text-sm font-medium transition-colors whitespace-nowrap ${
-            activeView === 'liked'
-              ? 'bg-[#E11D48] text-white'
-              : 'text-[#5C5A55] hover:bg-[#FAF9F7] hover:text-[#111111]'
-          }`}
-        >
-          <span className="flex items-center gap-3">
-            <Heart
-              className={`h-4 w-4 shrink-0 ${
-                activeView === 'liked' || likedCount > 0 ? 'fill-current' : ''
-              } ${activeView !== 'liked' && likedCount > 0 ? 'text-[#E11D48]' : ''}`}
-            />
-            <span>Liked Playlist</span>
-          </span>
-          {likedCount > 0 && (
-            <span
-              className={`font-mono text-xs tabular-nums ${
-                activeView === 'liked' ? 'text-white/90' : 'text-[#73716C]'
-              }`}
-            >
-              {likedCount}
-            </span>
-          )}
-        </button>
-      </nav>
-
-      {/* Followed Channels Quick Access */}
-      <div className="min-h-0 flex-1 overflow-y-auto border-t border-[#F2F0EC] px-3 py-3">
-        <div className="mb-2 flex items-center justify-between px-2">
-          <span className="text-xs font-semibold text-[#73716C]">Followed Channels</span>
-          {followedChannels.length > 0 && (
+      {/* Scrollable Sidebar Body */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {/* Tabs / Spaces Section */}
+        <div className="border-b border-[#F2F0EC] px-3 py-3">
+          <div className="mb-1.5 flex items-center justify-between px-2">
+            <span className="text-xs font-semibold text-[#73716C]">Tabs</span>
             <button
               type="button"
-              onClick={onOpenFollowing}
-              className="cursor-pointer text-[11px] font-medium text-[#73716C] hover:text-[#111111]"
+              onClick={onCreateTab}
+              className="inline-flex cursor-pointer items-center gap-1 text-[11px] font-semibold text-[#E11D48] hover:text-[#BE123C]"
             >
-              Manage
+              <Plus className="h-3 w-3" />
+              <span>New</span>
             </button>
-          )}
-        </div>
-
-        {followedChannels.length === 0 ? (
-          <p className="px-2 py-2 text-xs leading-relaxed text-[#73716C]">
-            Follow channels to pin them here for 1-click access.
-          </p>
-        ) : (
-          <ul className="space-y-0.5">
-            {followedChannels.map((ch) => {
-              const isCurrent =
-                activeView === 'channel' && activeChannelPath === ch.path;
+          </div>
+          <ul className="space-y-1">
+            {tabs.map((tab) => {
+              const active = tab.id === activeTabId;
+              const isKids = tab.kind === 'kids';
               return (
-                <li key={ch.id}>
+                <li key={tab.id} className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => onOpenChannel(ch.path)}
-                    className={`flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-lg px-2 text-left text-xs transition-colors ${
-                      isCurrent
-                        ? 'bg-[#FAF9F7] font-semibold text-[#E11D48]'
-                        : 'font-medium text-[#3D3C38] hover:bg-[#FAF9F7] hover:text-[#111111]'
+                    onClick={() => onSelectTab(tab)}
+                    className={`flex h-9 min-w-0 flex-1 cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 text-left text-xs font-medium transition-colors ${
+                      active
+                        ? 'bg-[#111111] text-white'
+                        : 'text-[#3D3C38] hover:bg-[#FAF9F7] hover:text-[#111111]'
                     }`}
                   >
-                    {ch.avatar ? (
-                      <img
-                        src={ch.avatar}
-                        alt=""
-                        referrerPolicy="no-referrer"
-                        className="h-6 w-6 shrink-0 rounded-full bg-[#EAE7E1] object-cover"
+                    <span className="flex min-w-0 items-center gap-2">
+                      {isKids && <Baby className="h-3.5 w-3.5 shrink-0" />}
+                      <span className="truncate">{tab.name}</span>
+                    </span>
+                    {!isKids && tab.pin && (
+                      <Lock
+                        className={`h-3 w-3 shrink-0 ${
+                          active ? 'text-white/80' : 'text-[#73716C]'
+                        }`}
                       />
-                    ) : (
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#111111] font-display text-[10px] font-bold text-white">
-                        {ch.title.charAt(0).toUpperCase()}
-                      </span>
                     )}
-                    <span className="truncate">{ch.title}</span>
+                    {isKids && tab.pin && (
+                      <ShieldCheck
+                        className={`h-3 w-3 shrink-0 ${
+                          active ? 'text-[#E11D48]' : 'text-[#E11D48]'
+                        }`}
+                      />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onEditTab(tab)}
+                    aria-label={`${tab.name} settings`}
+                    title={`${tab.name} settings & lock`}
+                    className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-[#73716C] hover:bg-[#FAF9F7] hover:text-[#111111]"
+                  >
+                    <Settings2 className="h-3.5 w-3.5" />
                   </button>
                 </li>
               );
             })}
           </ul>
-        )}
+        </div>
+
+        {/* Primary Vertical Nav Items */}
+        <nav aria-label="Main sections" className="space-y-1 px-3 py-3">
+          <button
+            type="button"
+            onClick={onResetHome}
+            className={`flex h-10 w-full cursor-pointer items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors whitespace-nowrap ${
+              activeView === 'explore'
+                ? 'bg-[#111111] text-white'
+                : 'text-[#5C5A55] hover:bg-[#FAF9F7] hover:text-[#111111]'
+            }`}
+          >
+            <Home className="h-4 w-4 shrink-0" />
+            <span>Home</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenFeed}
+            className={`flex h-10 w-full cursor-pointer items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors whitespace-nowrap ${
+              activeView === 'feed'
+                ? 'bg-[#111111] text-white'
+                : 'text-[#5C5A55] hover:bg-[#FAF9F7] hover:text-[#111111]'
+            }`}
+          >
+            <Compass className="h-4 w-4 shrink-0" />
+            <span>For You Feed</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenFollowing}
+            className={`flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-xl px-3 text-sm font-medium transition-colors whitespace-nowrap ${
+              activeView === 'following'
+                ? 'bg-[#111111] text-white'
+                : 'text-[#5C5A55] hover:bg-[#FAF9F7] hover:text-[#111111]'
+            }`}
+          >
+            <span className="flex items-center gap-3">
+              <Users className="h-4 w-4 shrink-0" />
+              <span>Following</span>
+            </span>
+            {followedChannels.length > 0 && (
+              <span
+                className={`font-mono text-xs tabular-nums ${
+                  activeView === 'following' ? 'text-white/80' : 'text-[#73716C]'
+                }`}
+              >
+                {followedChannels.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenLiked}
+            className={`flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-xl px-3 text-sm font-medium transition-colors whitespace-nowrap ${
+              activeView === 'liked'
+                ? 'bg-[#E11D48] text-white'
+                : 'text-[#5C5A55] hover:bg-[#FAF9F7] hover:text-[#111111]'
+            }`}
+          >
+            <span className="flex items-center gap-3">
+              <Heart
+                className={`h-4 w-4 shrink-0 ${
+                  activeView === 'liked' || likedCount > 0 ? 'fill-current' : ''
+                } ${activeView !== 'liked' && likedCount > 0 ? 'text-[#E11D48]' : ''}`}
+              />
+              <span>Liked Playlist</span>
+            </span>
+            {likedCount > 0 && (
+              <span
+                className={`font-mono text-xs tabular-nums ${
+                  activeView === 'liked' ? 'text-white/90' : 'text-[#73716C]'
+                }`}
+              >
+                {likedCount}
+              </span>
+            )}
+          </button>
+        </nav>
+
+        {/* Followed Channels Quick Access */}
+        <div className="border-t border-[#F2F0EC] px-3 py-3">
+          <div className="mb-2 flex items-center justify-between px-2">
+            <span className="text-xs font-semibold text-[#73716C]">Followed Channels</span>
+            {followedChannels.length > 0 && (
+              <button
+                type="button"
+                onClick={onOpenFollowing}
+                className="cursor-pointer text-[11px] font-medium text-[#73716C] hover:text-[#111111]"
+              >
+                Manage
+              </button>
+            )}
+          </div>
+
+          {followedChannels.length === 0 ? (
+            <p className="px-2 py-2 text-xs leading-relaxed text-[#73716C]">
+              Follow channels to pin them here for 1-click access.
+            </p>
+          ) : (
+            <ul className="space-y-0.5">
+              {followedChannels.map((ch) => {
+                const isCurrent =
+                  activeView === 'channel' && activeChannelPath === ch.path;
+                return (
+                  <li key={ch.id}>
+                    <button
+                      type="button"
+                      onClick={() => onOpenChannel(ch.path)}
+                      className={`flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-lg px-2 text-left text-xs transition-colors ${
+                        isCurrent
+                          ? 'bg-[#FAF9F7] font-semibold text-[#E11D48]'
+                          : 'font-medium text-[#3D3C38] hover:bg-[#FAF9F7] hover:text-[#111111]'
+                      }`}
+                    >
+                      {ch.avatar ? (
+                        <img
+                          src={ch.avatar}
+                          alt=""
+                          referrerPolicy="no-referrer"
+                          className="h-6 w-6 shrink-0 rounded-full bg-[#EAE7E1] object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#111111] font-display text-[10px] font-bold text-white">
+                          {ch.title.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                      <span className="truncate">{ch.title}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </div>
 
       {/* Bottom Install App CTA */}
@@ -231,3 +319,4 @@ export function LaptopSidebar({
     </aside>
   );
 }
+

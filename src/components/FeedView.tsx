@@ -7,6 +7,8 @@ import { MusicTrackRow } from './MusicTrackRow';
 interface FeedViewProps {
   appMode: 'videos' | 'music';
   isDesktop: boolean;
+  isKidsTab?: boolean;
+  activeTabName?: string;
   items: MediaItem[];
   seeds: string[];
   activeSeed: string | null;
@@ -30,7 +32,8 @@ interface FeedViewProps {
   onExpandFull: (
     item: MediaItem,
     initialRotation: 0 | 90 | 180 | 270,
-    startSeconds?: number
+    startSeconds?: number,
+    lockOnOpen?: boolean
   ) => void;
   onToggleLike: (item: MediaItem) => void;
   onOpenChannel: (path: string) => void;
@@ -40,6 +43,8 @@ interface FeedViewProps {
 export function FeedView({
   appMode,
   isDesktop,
+  isKidsTab = false,
+  activeTabName,
   items,
   seeds,
   activeSeed,
@@ -69,7 +74,7 @@ export function FeedView({
     isDesktop && appMode === 'videos' && Boolean(playingItem) && !hasExpandedPlayer;
 
   return (
-    <main className="mx-auto max-w-[1440px] px-3 pb-24 pt-5 sm:px-6 sm:pt-6">
+    <main className="mx-auto max-w-[1440px] px-3 pb-36 pt-5 sm:px-6 sm:pt-6 lg:pb-24">
       <div className="flex flex-col gap-4 border-b border-[#E5E3DD] pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <button
@@ -82,12 +87,16 @@ export function FeedView({
           </button>
 
           <h1 className="font-display text-2xl font-bold tracking-tight text-[#111111] sm:text-3xl">
-            For You Feed
+            {activeTabName && activeTabName !== 'Main'
+              ? `${activeTabName} Feed`
+              : 'For You Feed'}
           </h1>
           <p className="mt-1 text-sm text-[#5C5A55]">
-            {personalized
-              ? 'Songs and videos picked across all channels from what you watch and like'
-              : 'Popular mixes across YouTube · Watch or like videos to tailor this feed'}
+            {isKidsTab
+              ? 'Safe kids mix · Tap Rotate on any video to lock screen touches with your Kids PIN'
+              : personalized
+                ? 'Songs and videos picked across all channels from what you watch and like'
+                : 'Popular mixes across YouTube · Watch or like videos to tailor this tab feed'}
           </p>
         </div>
 
@@ -205,10 +214,15 @@ export function FeedView({
           <DesktopSplitPlayer
             playingItem={playingItem}
             queue={items}
-            queueTitle="For You Feed"
+            queueTitle={
+              activeTabName && activeTabName !== 'Main'
+                ? `${activeTabName} Feed`
+                : 'For You Feed'
+            }
             startSeconds={startSeconds}
             hasPrev={hasPrev}
             hasNext={hasNext}
+            isKidsTab={isKidsTab}
             isLiked={isLiked}
             onSelectVideo={(clicked) => onPlayItem(clicked, items)}
             onPrev={onPrev}
@@ -216,6 +230,7 @@ export function FeedView({
             onEnded={onEnded}
             onToggleLike={onToggleLike}
             onOpenFull={(sec) => onExpandFull(playingItem, 0, sec)}
+            onLockKidsScreen={(sec) => onExpandFull(playingItem, 0, sec, true)}
             onClose={onStopPlay}
             onOpenChannel={onOpenChannel}
           />
@@ -228,6 +243,7 @@ export function FeedView({
               item={item}
               isPlaying={playingItem?.id === item.id}
               suppressInlineFrame={hasExpandedPlayer || isDesktop}
+              isKidsTab={isKidsTab}
               isLiked={isLiked(item.id)}
               onPlay={(clicked) => onPlayItem(clicked, items)}
               onStopPlay={onStopPlay}

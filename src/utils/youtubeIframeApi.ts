@@ -9,6 +9,8 @@ export interface YTPlayerInstance {
   getCurrentTime?: () => number;
   getDuration?: () => number;
   setPlaybackQuality?: (suggestedQuality: string) => void;
+  unloadModule?: (moduleName: string) => void;
+  setOption?: (moduleName: string, option: string, value: unknown) => void;
   mute?: () => void;
   unMute?: () => void;
   isMuted?: () => boolean;
@@ -25,11 +27,24 @@ declare global {
           events?: {
             onReady?: (e: { target: YTPlayerInstance }) => void;
             onStateChange?: (e: { data: number; target: YTPlayerInstance }) => void;
+            onApiChange?: (e: { target: YTPlayerInstance }) => void;
           };
         }
       ) => YTPlayerInstance;
     };
     onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
+export function disableYouTubeCaptions(player: YTPlayerInstance | null | undefined): void {
+  if (!player) return;
+  try {
+    player.unloadModule?.('captions');
+    player.unloadModule?.('cc');
+    player.setOption?.('captions', 'track', {});
+    player.setOption?.('cc', 'track', {});
+  } catch {
+    // Ignore if captions module is not attached
   }
 }
 
