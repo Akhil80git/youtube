@@ -2,6 +2,7 @@ import {
   Columns2,
   Heart,
   Loader2,
+  Lock,
   Maximize2,
   Play,
   SkipBack,
@@ -11,6 +12,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import type { MediaItem } from '../types';
 import {
+  disableYouTubeCaptions,
   ensureYouTubeIframeApi,
   isValidVideoId,
   type YTPlayerInstance,
@@ -23,6 +25,7 @@ interface DesktopSplitPlayerProps {
   startSeconds?: number;
   hasPrev: boolean;
   hasNext: boolean;
+  isKidsTab?: boolean;
   isLiked: (id: string) => boolean;
   hasMore?: boolean;
   loadingMore?: boolean;
@@ -33,6 +36,7 @@ interface DesktopSplitPlayerProps {
   onEnded: () => void;
   onToggleLike: (item: MediaItem) => void;
   onOpenFull: (currentSeconds: number) => void;
+  onLockKidsScreen?: (currentSeconds: number) => void;
   onClose: () => void;
   onOpenChannel?: (path: string) => void;
 }
@@ -44,6 +48,7 @@ export function DesktopSplitPlayer({
   startSeconds = 0,
   hasPrev,
   hasNext,
+  isKidsTab = false,
   isLiked,
   hasMore = false,
   loadingMore = false,
@@ -54,6 +59,7 @@ export function DesktopSplitPlayer({
   onEnded,
   onToggleLike,
   onOpenFull,
+  onLockKidsScreen,
   onClose,
   onOpenChannel,
 }: DesktopSplitPlayerProps) {
@@ -105,17 +111,26 @@ export function DesktopSplitPlayer({
             rel: 0,
             modestbranding: 1,
             playsinline: 1,
+            cc_load_policy: 0,
+            iv_load_policy: 3,
             ...(startSeconds > 1 ? { start: Math.floor(startSeconds) } : {}),
           },
           events: {
             onReady: (e) => {
+              disableYouTubeCaptions(e.target);
               try {
                 e.target.playVideo();
               } catch {
                 // ignore autoplay restriction
               }
             },
+            onApiChange: (e) => {
+              disableYouTubeCaptions(e.target);
+            },
             onStateChange: (e) => {
+              if (e.data === 1 || e.data === 3 || e.data === 5) {
+                disableYouTubeCaptions(e.target);
+              }
               if (e.data === 0) onEndedRef.current();
             },
           },
@@ -148,7 +163,7 @@ export function DesktopSplitPlayer({
   const likedActive = isLiked(playingItem.id);
   const currentIndex = queue.findIndex((q) => q.id === playingItem.id);
   const embedStart = startSeconds > 1 ? `&start=${Math.floor(startSeconds)}` : '';
-  const embedUrl = `https://www.youtube.com/embed/${playingItem.id}?autoplay=1&rel=0&modestbranding=1&playsinline=1${embedStart}`;
+  const embedUrl = `https://www.youtube.com/embed/${playingItem.id}?autoplay=1&rel=0&modestbranding=1&playsinline=1&cc_load_policy=0&iv_load_policy=3${embedStart}`;
 
   function handleSwitchFull() {
     let sec = 0;
@@ -166,7 +181,7 @@ export function DesktopSplitPlayer({
       className="hidden lg:grid lg:grid-cols-12 lg:items-start lg:gap-6"
     >
       {/* Left Half: Sticky HD Video Player + Half/Full Option */}
-      <div className="lg:sticky lg:top-20 lg:col-span-7">
+      <div className="lg:sticky lg:top-16 lg:col-span-7">
         <div className="aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-sm ring-1 ring-black/10">
           {fallback ? (
             <iframe
@@ -217,28 +232,49 @@ export function DesktopSplitPlayer({
               )}
             </div>
 
-            {/* Half vs Full Option */}
-            <div
-              role="group"
-              aria-label="Player layout mode"
-              className="inline-flex shrink-0 items-center rounded-lg border border-[#E5E3DD] bg-[#F2F0EC] p-0.5"
-            >
-              <button
-                type="button"
-                aria-pressed="true"
-                className="inline-flex h-8 cursor-default items-center gap-1.5 rounded-md bg-[#111111] px-2.5 text-xs font-medium text-white whitespace-nowrap"
+            {/* Half vs Full Option + Kids Screen Lock */}
+            <div className="flex shrink-0 items-center gap-2">
+              {isKidsTab && onLockKidsScreen && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    let sec = 0;
+                    try {
+                      sec = playerRef.current?.getCurrentTime?.() ?? 0;
+                    } catch {
+                      sec = 0;
+                    }
+                    onLockKidsScreen(Number.isFinite(sec) ? sec : 0);
+                  }}
+                  className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-[#E11D48] bg-[#E11D48]/10 px-2.5 text-xs font-semibold text-[#E11D48] transition-colors hover:bg-[#E11D48] hover:text-white whitespace-nowrap"
+                >
+                  <Lock className="h-3.5 w-3.5" />
+                  <span>Kids Lock</span>
+                </button>
+              )}
+
+              <div
+                role="group"
+                aria-label="Player layout mode"
+                className="inline-flex shrink-0 items-center rounded-lg border border-[#E5E3DD] bg-[#F2F0EC] p-0.5"
               >
-                <Columns2 className="h-3.5 w-3.5" />
-                <span>Half</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleSwitchFull}
-                className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-[#5C5A55] transition-colors hover:text-[#111111] whitespace-nowrap"
-              >
-                <Maximize2 className="h-3.5 w-3.5" />
-                <span>Full</span>
-              </button>
+                <button
+                  type="button"
+                  aria-pressed="true"
+                  className="inline-flex h-8 cursor-default items-center gap-1.5 rounded-md bg-[#111111] px-2.5 text-xs font-medium text-white whitespace-nowrap"
+                >
+                  <Columns2 className="h-3.5 w-3.5" />
+                  <span>Half</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSwitchFull}
+                  className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-[#5C5A55] transition-colors hover:text-[#111111] whitespace-nowrap"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" />
+                  <span>Full</span>
+                </button>
+              </div>
             </div>
           </div>
 

@@ -24,6 +24,7 @@ import { MusicTrackRow } from './MusicTrackRow';
 interface ChannelViewProps {
   appMode: 'videos' | 'music';
   isDesktop: boolean;
+  isKidsTab?: boolean;
   channel: ChannelInfo;
   activeTab: ChannelTab;
   items: MediaItem[];
@@ -56,7 +57,8 @@ interface ChannelViewProps {
   onExpandFull: (
     item: MediaItem,
     initialRotation: 0 | 90 | 180 | 270,
-    startSeconds?: number
+    startSeconds?: number,
+    lockOnOpen?: boolean
   ) => void;
   onOpenPlaylist: (playlist: PlaylistCard) => void;
   onClosePlaylist: () => void;
@@ -85,6 +87,7 @@ function parseViewNumber(text: string): number {
 export function ChannelView({
   appMode,
   isDesktop,
+  isKidsTab = false,
   channel,
   activeTab,
   items,
@@ -156,7 +159,7 @@ export function ChannelView({
     activeTab !== 'about';
 
   return (
-    <main className="mx-auto max-w-[1440px] px-3 pb-24 pt-4 sm:px-6 sm:pt-6">
+    <main className="mx-auto max-w-[1440px] px-3 pb-36 pt-4 sm:px-6 sm:pt-6 lg:pb-24">
       {/* Channel Banner */}
       {channel.banner && !bannerError && (
         <div className="mb-4 aspect-[4/1] w-full overflow-hidden rounded-xl bg-[#EAE7E1] sm:mb-6 sm:aspect-[6/1] sm:rounded-2xl">
@@ -457,6 +460,7 @@ export function ChannelView({
                     startSeconds={startSeconds}
                     hasPrev={hasPrev}
                     hasNext={hasNext}
+                    isKidsTab={isKidsTab}
                     isLiked={isLiked}
                     onSelectVideo={(vid) =>
                       onPlayItem(vid, activePlaylist.videos, activePlaylist.title)
@@ -466,6 +470,7 @@ export function ChannelView({
                     onEnded={onEnded}
                     onToggleLike={onToggleLike}
                     onOpenFull={(sec) => onExpandFull(playingItem, 0, sec)}
+                    onLockKidsScreen={(sec) => onExpandFull(playingItem, 0, sec, true)}
                     onClose={onStopPlay}
                   />
                 )}
@@ -478,6 +483,7 @@ export function ChannelView({
                         item={vid}
                         isPlaying={playingItem?.id === vid.id}
                         suppressInlineFrame={hasExpandedPlayer || isDesktop}
+                        isKidsTab={isKidsTab}
                         isLiked={isLiked(vid.id)}
                         onPlay={(item) =>
                           onPlayItem(item, activePlaylist.videos, activePlaylist.title)
@@ -535,6 +541,7 @@ export function ChannelView({
                 startSeconds={startSeconds}
                 hasPrev={hasPrev}
                 hasNext={hasNext}
+                isKidsTab={isKidsTab}
                 isLiked={isLiked}
                 hasMore={hasMore}
                 loadingMore={loadingMore}
@@ -545,6 +552,7 @@ export function ChannelView({
                 onEnded={onEnded}
                 onToggleLike={onToggleLike}
                 onOpenFull={(sec) => onExpandFull(playingItem, 0, sec)}
+                onLockKidsScreen={(sec) => onExpandFull(playingItem, 0, sec, true)}
                 onClose={onStopPlay}
               />
             </div>
@@ -562,6 +570,7 @@ export function ChannelView({
                   item={item}
                   isPlaying={playingItem?.id === item.id}
                   suppressInlineFrame={hasExpandedPlayer || isDesktop}
+                  isKidsTab={isKidsTab}
                   isLiked={isLiked(item.id)}
                   onPlay={(clicked) => onPlayItem(clicked, filteredItems)}
                   onStopPlay={onStopPlay}

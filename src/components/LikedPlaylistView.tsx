@@ -8,6 +8,7 @@ import { MusicTrackRow } from './MusicTrackRow';
 interface LikedPlaylistViewProps {
   appMode: 'videos' | 'music';
   isDesktop: boolean;
+  isKidsTab?: boolean;
   likedItems: LikedItem[];
   playingItem: MediaItem | null;
   startSeconds: number;
@@ -25,7 +26,8 @@ interface LikedPlaylistViewProps {
   onExpandFull: (
     item: MediaItem,
     initialRotation: 0 | 90 | 180 | 270,
-    startSeconds?: number
+    startSeconds?: number,
+    lockOnOpen?: boolean
   ) => void;
   onToggleAutoPlay: () => void;
   onToggleLoop: () => void;
@@ -37,6 +39,7 @@ interface LikedPlaylistViewProps {
 export function LikedPlaylistView({
   appMode,
   isDesktop,
+  isKidsTab = false,
   likedItems,
   playingItem,
   startSeconds,
@@ -75,7 +78,7 @@ export function LikedPlaylistView({
     isDesktop && appMode === 'videos' && Boolean(playingItem) && !hasExpandedPlayer;
 
   return (
-    <main className="mx-auto max-w-[1440px] px-3 pb-24 pt-5 sm:px-6 sm:pt-6">
+    <main className="mx-auto max-w-[1440px] px-3 pb-36 pt-5 sm:px-6 sm:pt-6 lg:pb-24">
       <div className="flex flex-col gap-4 border-b border-[#E5E3DD] pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <button
@@ -233,6 +236,7 @@ export function LikedPlaylistView({
             startSeconds={startSeconds}
             hasPrev={hasPrev}
             hasNext={hasNext}
+            isKidsTab={isKidsTab}
             isLiked={() => true}
             onSelectVideo={(clicked) => onPlayTrack(clicked, false)}
             onPrev={onPrev}
@@ -240,6 +244,7 @@ export function LikedPlaylistView({
             onEnded={onEnded}
             onToggleLike={onToggleLike}
             onOpenFull={(sec) => onExpandFull(playingItem, 0, sec)}
+            onLockKidsScreen={(sec) => onExpandFull(playingItem, 0, sec, true)}
             onClose={onStopPlay}
           />
         </div>
@@ -251,6 +256,7 @@ export function LikedPlaylistView({
               item={item}
               isPlaying={playingItem?.id === item.id}
               suppressInlineFrame={hasExpandedPlayer || isDesktop}
+              isKidsTab={isKidsTab}
               isLiked={true}
               onPlay={(clicked) => onPlayTrack(clicked, false)}
               onStopPlay={onStopPlay}

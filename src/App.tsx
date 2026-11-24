@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BottomNav } from './components/BottomNav';
 import { ChannelView } from './components/ChannelView';
 import { ExploreHome } from './components/ExploreHome';
 import { FeedView } from './components/FeedView';
@@ -7,10 +8,13 @@ import { LaptopSidebar } from './components/LaptopSidebar';
 import { LikedPlaylistView } from './components/LikedPlaylistView';
 import { MusicPlayerBar } from './components/MusicPlayerBar';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { PinModal } from './components/PinModal';
 import { RotatedFullPlayer } from './components/RotatedFullPlayer';
 import { SearchResultsView } from './components/SearchResultsView';
+import { TabModal } from './components/TabModal';
 import { TopNav } from './components/TopNav';
 import type {
+  AppTab,
   ChannelAbout,
   ChannelInfo,
   ChannelSearchResult,
@@ -23,22 +27,120 @@ import type {
   MediaItem,
   PlaylistCard,
   PlaylistDetailResponse,
+  RecentChannel,
   SearchVideosResponse,
+  TabDataState,
 } from './types';
 import { safeFetchJson } from './utils/api';
 
-interface RecentChannel {
-  title: string;
-  handle: string;
-  path: string;
-  avatar: string;
+const LEGACY_RECENT_STORAGE_KEY = 'channelplay_recent_channels';
+const LEGACY_RECENT_SEARCHES_STORAGE_KEY = 'channelplay_recent_searches';
+const LEGACY_LIKED_STORAGE_KEY = 'channelplay_liked_items';
+const LEGACY_FOLLOWED_STORAGE_KEY = 'channelplay_followed_channels';
+const LEGACY_WATCH_HISTORY_STORAGE_KEY = 'channelplay_watch_history';
+
+const TABS_STORAGE_KEY = 'yt_tabs_v1';
+const ACTIVE_TAB_STORAGE_KEY = 'yt_active_tab_id_v1';
+const HAS_VISITED_STORAGE_KEY = 'yt_has_visited_v1';
+const TAB_DATA_PREFIX = 'yt_tab_data_v1_';
+
+const DEFAULT_TABS: AppTab[] = [
+  { id: 'main', name: 'Main', kind: 'default' },
+  { id: 'kids', name: 'Kids', kind: 'kids' },
+];
+
+const KIDS_DEFAULT_SEEDS = [
+  'kids cartoons nursery rhymes',
+  'learning videos for kids',
+  'moral stories for kids',
+  'kids songs animation',
+];
+
+function createEmptyTabData(): TabDataState {
+  return {
+    appMode: 'videos',
+    recentChannels: [],
+    recentSearches: [],
+    likedItems: [],
+    followedChannels: [],
+    watchHistory: [],
+  };
 }
 
-const RECENT_STORAGE_KEY = 'channelplay_recent_channels';
-const RECENT_SEARCHES_STORAGE_KEY = 'channelplay_recent_searches';
-const LIKED_STORAGE_KEY = 'channelplay_liked_items';
-const FOLLOWED_STORAGE_KEY = 'channelplay_followed_channels';
-const WATCH_HISTORY_STORAGE_KEY = 'channelplay_watch_history';
+function loadStorage<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return parsed ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveStorage(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore storage quota issues
+  }
+}
+
+function loadInitialTabs(): AppTab[] {
+  const stored = loadStorage<AppTab[]>(TABS_STORAGE_KEY, []);
+  if (!Array.isArray(stored) || stored.length === 0) {
+    saveStorage(TABS_STORAGE_KEY, DEFAULT_TABS);
+    return DEFAULT_TABS;
+  }
+
+  const hasMain = stored.some((t) => t.id === 'main');
+  const hasKids = stored.some((t) => t.id === 'kids');
+  const normalized = [...stored];
+  if (!hasMain) normalized.unshift(DEFAULT_TABS[0]);
+  if (!hasKids) {
+    const mainIdx = normalized.findIndex((t) => t.id === 'main');
+    normalized.splice(mainIdx >= 0 ? mainIdx + 1 : 0, 0, DEFAULT_TABS[1]);
+  }
+  return normalized;
+}
+
+function loadTabData(tabId: string): TabDataState {
+  const key = `${TAB_DATA_PREFIX}${tabId}`;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<TabDataState>;
+      return {
+        appMode: parsed.appMode === 'music' ? 'music' : 'videos',
+        recentChannels: Array.isArray(parsed.recentChannels) ? parsed.recentChannels : [],
+        recentSearches: Array.isArray(parsed.recentSearches) ? parsed.recentSearches : [],
+        likedItems: Array.isArray(parsed.likedItems) ? parsed.likedItems : [],
+        followedChannels: Array.isArray(parsed.followedChannels) ? parsed.followedChannels : [],
+        watchHistory: Array.isArray(parsed.watchHistory) ? parsed.watchHistory : [],
+      };
+    }
+  } catch {
+    // Ignore parse error
+  }
+
+  // One-time migration of legacy single-user storage into the Main tab
+  if (tabId === 'main') {
+    const migrated: TabDataState = {
+      appMode: 'videos',
+      recentChannels: loadStorage<RecentChannel[]>(LEGACY_RECENT_STORAGE_KEY, []),
+      recentSearches: loadStorage<string[]>(LEGACY_RECENT_SEARCHES_STORAGE_KEY, []),
+      likedItems: loadStorage<LikedItem[]>(LEGACY_LIKED_STORAGE_KEY, []),
+      followedChannels: loadStorage<FollowedChannel[]>(LEGACY_FOLLOWED_STORAGE_KEY, []),
+      watchHistory: loadStorage<MediaItem[]>(LEGACY_WATCH_HISTORY_STORAGE_KEY, []),
+    };
+    saveStorage(key, migrated);
+    return migrated;
+  }
+
+  const empty = createEmptyTabData();
+  saveStorage(key, empty);
+  return empty;
+}
 
 function cleanSeedPhrase(raw: string): string {
   const cleaned = raw
@@ -52,6 +154,7 @@ function cleanSeedPhrase(raw: string): string {
 }
 
 function deriveFeedSeeds(
+  tab: AppTab,
   watchHistory: MediaItem[],
   likedItems: LikedItem[],
   followedChannels: FollowedChannel[],
@@ -68,7 +171,6 @@ function deriveFeedSeeds(
     seeds.push(trimmed);
   };
 
-  // Mix recent watched video themes & liked songs/videos
   for (const item of watchHistory.slice(0, 4)) {
     const phrase = cleanSeedPhrase(item.title);
     if (phrase) pushSeed(phrase);
@@ -89,25 +191,92 @@ function deriveFeedSeeds(
     pushSeed(ch.title);
   }
 
+  const hasPersonalHistory = seeds.length > 0;
+
+  if (tab.kind === 'kids' && seeds.length < 2) {
+    for (const kidSeed of KIDS_DEFAULT_SEEDS) {
+      pushSeed(kidSeed);
+    }
+  } else if (tab.kind === 'custom' && seeds.length === 0) {
+    pushSeed(tab.name);
+    pushSeed(`${tab.name} trending`);
+    pushSeed(`${tab.name} playlist`);
+  }
+
   return {
     seeds: seeds.slice(0, 6),
-    personalized: seeds.length > 0,
+    personalized: hasPersonalHistory,
   };
 }
 
-function loadStorage<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw);
-    return parsed ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
 export default function App() {
-  const [appMode, setAppMode] = useState<'videos' | 'music'>('videos');
+  const [tabs, setTabs] = useState<AppTab[]>(() => loadInitialTabs());
+  const [activeTabId, setActiveTabId] = useState<string>(() => {
+    const initialTabs = loadInitialTabs();
+    const savedId =
+      typeof window !== 'undefined' ? localStorage.getItem(ACTIVE_TAB_STORAGE_KEY) : null;
+    if (savedId && initialTabs.some((t) => t.id === savedId)) {
+      return savedId;
+    }
+    return initialTabs[0]?.id || 'main';
+  });
+
+  const [tabDataMap, setTabDataMap] = useState<Record<string, TabDataState>>(() => {
+    const initialTabs = loadInitialTabs();
+    const savedId =
+      typeof window !== 'undefined' ? localStorage.getItem(ACTIVE_TAB_STORAGE_KEY) : null;
+    const startId =
+      savedId && initialTabs.some((t) => t.id === savedId)
+        ? savedId
+        : initialTabs[0]?.id || 'main';
+    return {
+      [startId]: loadTabData(startId),
+    };
+  });
+
+  // Tab unlock / modal states
+  const [pendingUnlockTab, setPendingUnlockTab] = useState<{
+    tab: AppTab;
+    openFeedAfter: boolean;
+  } | null>(null);
+  const [tabModalState, setTabModalState] = useState<{
+    mode: 'create' | 'edit';
+    tab?: AppTab;
+  } | null>(null);
+  const [passwordModalTab, setPasswordModalTab] = useState<{
+    tab: AppTab;
+    activateAfter?: boolean;
+  } | null>(null);
+
+  const currentTab = useMemo(
+    () => tabs.find((t) => t.id === activeTabId) || tabs[0] || DEFAULT_TABS[0],
+    [tabs, activeTabId]
+  );
+
+  const currentTabData = useMemo(
+    () => tabDataMap[activeTabId] || loadTabData(activeTabId),
+    [tabDataMap, activeTabId]
+  );
+
+  const appMode = currentTabData.appMode;
+  const recentChannels = currentTabData.recentChannels;
+  const recentSearches = currentTabData.recentSearches;
+  const likedItems = currentTabData.likedItems;
+  const followedChannels = currentTabData.followedChannels;
+  const watchHistory = currentTabData.watchHistory;
+
+  const updateTabData = useCallback(
+    (tabId: string, updater: (prev: TabDataState) => TabDataState) => {
+      setTabDataMap((prev) => {
+        const base = prev[tabId] || loadTabData(tabId);
+        const next = updater(base);
+        saveStorage(`${TAB_DATA_PREFIX}${tabId}`, next);
+        return { ...prev, [tabId]: next };
+      });
+    },
+    []
+  );
+
   const [query, setQuery] = useState('');
   const [viewMode, setViewMode] = useState<
     'explore' | 'feed' | 'search' | 'channel' | 'following' | 'liked'
@@ -139,6 +308,7 @@ export default function App() {
     item: MediaItem;
     initialRotation: 0 | 90 | 180 | 270;
     startSeconds?: number;
+    lockOnOpen?: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -157,22 +327,6 @@ export default function App() {
   const [activePlaylist, setActivePlaylist] = useState<PlaylistDetailResponse | null>(null);
   const [loadingPlaylist, setLoadingPlaylist] = useState(false);
 
-  const [recentChannels, setRecentChannels] = useState<RecentChannel[]>(() =>
-    loadStorage<RecentChannel[]>(RECENT_STORAGE_KEY, [])
-  );
-  const [recentSearches, setRecentSearches] = useState<string[]>(() =>
-    loadStorage<string[]>(RECENT_SEARCHES_STORAGE_KEY, [])
-  );
-  const [likedItems, setLikedItems] = useState<LikedItem[]>(() =>
-    loadStorage<LikedItem[]>(LIKED_STORAGE_KEY, [])
-  );
-  const [followedChannels, setFollowedChannels] = useState<FollowedChannel[]>(() =>
-    loadStorage<FollowedChannel[]>(FOLLOWED_STORAGE_KEY, [])
-  );
-  const [watchHistory, setWatchHistory] = useState<MediaItem[]>(() =>
-    loadStorage<MediaItem[]>(WATCH_HISTORY_STORAGE_KEY, [])
-  );
-
   const [feedItems, setFeedItems] = useState<MediaItem[]>([]);
   const [loadingFeed, setLoadingFeed] = useState(false);
   const [feedError, setFeedError] = useState<string | null>(null);
@@ -186,47 +340,48 @@ export default function App() {
   const [loadingMoreSearch, setLoadingMoreSearch] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  const saveRecentSearch = useCallback((term: string) => {
-    const clean = term.trim();
-    if (!clean) return;
-    setRecentSearches((prev) => {
-      const next = [
-        clean,
-        ...prev.filter((item) => item.toLowerCase() !== clean.toLowerCase()),
-      ].slice(0, 12);
-      try {
-        localStorage.setItem(RECENT_SEARCHES_STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // Ignore storage quota issues
-      }
-      return next;
-    });
-  }, []);
+  const saveRecentSearch = useCallback(
+    (term: string) => {
+      const clean = term.trim();
+      if (!clean) return;
+      updateTabData(activeTabId, (prev) => ({
+        ...prev,
+        recentSearches: [
+          clean,
+          ...prev.recentSearches.filter((item) => item.toLowerCase() !== clean.toLowerCase()),
+        ].slice(0, 12),
+      }));
+    },
+    [activeTabId, updateTabData]
+  );
 
-  const handleRemoveRecentSearch = useCallback((term: string) => {
-    setRecentSearches((prev) => {
-      const next = prev.filter((item) => item !== term);
-      try {
-        localStorage.setItem(RECENT_SEARCHES_STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // Ignore storage quota issues
-      }
-      return next;
-    });
-  }, []);
+  const handleRemoveRecentSearch = useCallback(
+    (term: string) => {
+      updateTabData(activeTabId, (prev) => ({
+        ...prev,
+        recentSearches: prev.recentSearches.filter((item) => item !== term),
+      }));
+    },
+    [activeTabId, updateTabData]
+  );
 
   const handleClearRecentSearches = useCallback(() => {
-    setRecentSearches([]);
-    try {
-      localStorage.removeItem(RECENT_SEARCHES_STORAGE_KEY);
-    } catch {
-      // Ignore storage quota issues
-    }
-  }, []);
+    updateTabData(activeTabId, (prev) => ({
+      ...prev,
+      recentSearches: [],
+    }));
+  }, [activeTabId, updateTabData]);
 
   const feedSeedInfo = useMemo(
-    () => deriveFeedSeeds(watchHistory, likedItems, followedChannels, recentChannels),
-    [watchHistory, likedItems, followedChannels, recentChannels]
+    () =>
+      deriveFeedSeeds(
+        currentTab,
+        watchHistory,
+        likedItems,
+        followedChannels,
+        recentChannels
+      ),
+    [currentTab, watchHistory, likedItems, followedChannels, recentChannels]
   );
 
   const recordWatch = useCallback(
@@ -236,17 +391,12 @@ export default function App() {
         channelTitle: item.channelTitle || channel?.title,
         channelPath: item.channelPath || channel?.path,
       };
-      setWatchHistory((prev) => {
-        const next = [tagged, ...prev.filter((w) => w.id !== item.id)].slice(0, 30);
-        try {
-          localStorage.setItem(WATCH_HISTORY_STORAGE_KEY, JSON.stringify(next));
-        } catch {
-          // Ignore storage quota issues
-        }
-        return next;
-      });
+      updateTabData(activeTabId, (prev) => ({
+        ...prev,
+        watchHistory: [tagged, ...prev.watchHistory.filter((w) => w.id !== item.id)].slice(0, 30),
+      }));
     },
-    [channel?.title, channel?.path]
+    [activeTabId, channel?.path, channel?.title, updateTabData]
   );
 
   const likedIdSet = useMemo(() => new Set(likedItems.map((l) => l.id)), [likedItems]);
@@ -257,63 +407,47 @@ export default function App() {
 
   const isLiked = useCallback((id: string) => likedIdSet.has(id), [likedIdSet]);
 
-  const persistLiked = useCallback((next: LikedItem[]) => {
-    try {
-      localStorage.setItem(LIKED_STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // Ignore storage quota issues
-    }
-  }, []);
-
-  const persistFollowed = useCallback((next: FollowedChannel[]) => {
-    try {
-      localStorage.setItem(FOLLOWED_STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // Ignore storage quota issues
-    }
-  }, []);
-
   const handleToggleLike = useCallback(
     (item: MediaItem) => {
-      setLikedItems((prev) => {
-        const exists = prev.some((l) => l.id === item.id);
-        const next = exists
-          ? prev.filter((l) => l.id !== item.id)
+      updateTabData(activeTabId, (prev) => {
+        const exists = prev.likedItems.some((l) => l.id === item.id);
+        const nextLiked = exists
+          ? prev.likedItems.filter((l) => l.id !== item.id)
           : [
               {
                 ...item,
                 channelTitle: item.channelTitle || channel?.title || 'YouTube',
                 likedAt: Date.now(),
               },
-              ...prev,
+              ...prev.likedItems,
             ];
-        persistLiked(next);
         if (playingLikedQueue) {
-          setPlayerQueue(next);
+          setPlayerQueue(nextLiked);
         }
-        return next;
+        return { ...prev, likedItems: nextLiked };
       });
     },
-    [channel?.title, persistLiked, playingLikedQueue]
+    [activeTabId, channel?.title, playingLikedQueue, updateTabData]
   );
 
   const handleClearLiked = useCallback(() => {
-    setLikedItems([]);
-    persistLiked([]);
+    updateTabData(activeTabId, (prev) => ({ ...prev, likedItems: [] }));
     if (playingLikedQueue) {
       setPlayerQueue([]);
       setPlayingItem(null);
       setExpandedPlayer(null);
     }
-  }, [persistLiked, playingLikedQueue]);
+  }, [activeTabId, playingLikedQueue, updateTabData]);
 
   const handleToggleFollow = useCallback(
     (ch: ChannelInfo) => {
       const key = ch.id || ch.path;
-      setFollowedChannels((prev) => {
-        const exists = prev.some((f) => f.id === key || f.path === ch.path);
-        const next = exists
-          ? prev.filter((f) => f.id !== key && f.path !== ch.path)
+      updateTabData(activeTabId, (prev) => {
+        const exists = prev.followedChannels.some(
+          (f) => f.id === key || f.path === ch.path
+        );
+        const nextFollowed = exists
+          ? prev.followedChannels.filter((f) => f.id !== key && f.path !== ch.path)
           : [
               {
                 id: key,
@@ -324,45 +458,41 @@ export default function App() {
                 subscribersText: ch.subscribersText,
                 followedAt: Date.now(),
               },
-              ...prev,
+              ...prev.followedChannels,
             ];
-        persistFollowed(next);
-        return next;
+        return { ...prev, followedChannels: nextFollowed };
       });
     },
-    [persistFollowed]
+    [activeTabId, updateTabData]
   );
 
   const handleUnfollow = useCallback(
     (id: string) => {
-      setFollowedChannels((prev) => {
-        const next = prev.filter((f) => f.id !== id);
-        persistFollowed(next);
-        return next;
-      });
+      updateTabData(activeTabId, (prev) => ({
+        ...prev,
+        followedChannels: prev.followedChannels.filter((f) => f.id !== id),
+      }));
     },
-    [persistFollowed]
+    [activeTabId, updateTabData]
   );
 
-  const saveRecentChannel = useCallback((info: ChannelInfo) => {
-    setRecentChannels((prev) => {
-      const next = [
-        {
-          title: info.title,
-          handle: info.handle || info.path,
-          path: info.path,
-          avatar: info.avatar,
-        },
-        ...prev.filter((c) => c.path !== info.path),
-      ].slice(0, 8);
-      try {
-        localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // Ignore storage quota issues
-      }
-      return next;
-    });
-  }, []);
+  const saveRecentChannel = useCallback(
+    (info: ChannelInfo) => {
+      updateTabData(activeTabId, (prev) => ({
+        ...prev,
+        recentChannels: [
+          {
+            title: info.title,
+            handle: info.handle || info.path,
+            path: info.path,
+            avatar: info.avatar,
+          },
+          ...prev.recentChannels.filter((c) => c.path !== info.path),
+        ].slice(0, 8),
+      }));
+    },
+    [activeTabId, updateTabData]
+  );
 
   const fetchChannel = useCallback(
     async (channelInput: string, tab: ChannelTab = 'videos', isTabSwitch = false) => {
@@ -410,13 +540,20 @@ export default function App() {
     [saveRecentChannel]
   );
 
-  const loadFeed = useCallback(
-    async (selectedSeed: string | null = activeFeedSeed) => {
+  const loadFeedForContext = useCallback(
+    async (targetTab: AppTab, targetData: TabDataState, selectedSeed: string | null) => {
       setLoadingFeed(true);
       setFeedError(null);
       try {
-        const seedsToUse = selectedSeed ? [selectedSeed] : feedSeedInfo.seeds.slice(0, 4);
-        const excludeParam = watchHistory
+        const seedResult = deriveFeedSeeds(
+          targetTab,
+          targetData.watchHistory,
+          targetData.likedItems,
+          targetData.followedChannels,
+          targetData.recentChannels
+        );
+        const seedsToUse = selectedSeed ? [selectedSeed] : seedResult.seeds.slice(0, 4);
+        const excludeParam = targetData.watchHistory
           .slice(0, 12)
           .map((w) => w.id)
           .join(',');
@@ -432,14 +569,179 @@ export default function App() {
         setLoadingFeed(false);
       }
     },
-    [activeFeedSeed, feedSeedInfo.seeds, watchHistory]
+    []
+  );
+
+  const loadFeed = useCallback(
+    async (selectedSeed: string | null = activeFeedSeed) => {
+      await loadFeedForContext(currentTab, currentTabData, selectedSeed);
+    },
+    [activeFeedSeed, currentTab, currentTabData, loadFeedForContext]
   );
 
   const openFeedView = useCallback(() => {
     setViewMode('feed');
     window.history.replaceState(null, '', '#feed');
-    loadFeed(activeFeedSeed);
-  }, [activeFeedSeed, loadFeed]);
+    loadFeedForContext(currentTab, currentTabData, activeFeedSeed);
+  }, [activeFeedSeed, currentTab, currentTabData, loadFeedForContext]);
+
+  const activateTab = useCallback(
+    (targetTab: AppTab, openFeed = true) => {
+      stopLoadAllRef.current = true;
+      setLoadingAll(false);
+      setError(null);
+      setFeedError(null);
+      setSearchError(null);
+      setPlayingItem(null);
+      setPlayingLikedQueue(false);
+      setPlayerQueue([]);
+      setExpandedPlayer(null);
+      setChannel(null);
+      setItems([]);
+      setPlaylists([]);
+      setAbout(null);
+      setContinuation(null);
+      setActivePlaylist(null);
+      setSearchQuery('');
+      setSearchVideosList([]);
+      setSearchChannelsList([]);
+      setSearchContinuation(null);
+      setQuery('');
+      setActiveFeedSeed(null);
+
+      const loadedData = tabDataMap[targetTab.id] || loadTabData(targetTab.id);
+      setTabDataMap((prev) => (prev[targetTab.id] ? prev : { ...prev, [targetTab.id]: loadedData }));
+      setActiveTabId(targetTab.id);
+      try {
+        localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, targetTab.id);
+      } catch {
+        // Ignore storage error
+      }
+
+      if (openFeed) {
+        setViewMode('feed');
+        window.history.replaceState(null, '', '#feed');
+        loadFeedForContext(targetTab, loadedData, null);
+      } else {
+        setViewMode('explore');
+        window.history.replaceState(null, '', '#');
+      }
+    },
+    [loadFeedForContext, tabDataMap]
+  );
+
+  const handleSelectTab = useCallback(
+    (targetTab: AppTab) => {
+      if (targetTab.id === activeTabId) {
+        if (viewMode !== 'feed') {
+          openFeedView();
+        }
+        return;
+      }
+
+      // Kids tab NEVER asks password on tab entry (only screen/rotation lock)
+      if (targetTab.kind !== 'kids' && targetTab.pin) {
+        setPendingUnlockTab({ tab: targetTab, openFeedAfter: true });
+        return;
+      }
+
+      activateTab(targetTab, true);
+    },
+    [activeTabId, activateTab, openFeedView, viewMode]
+  );
+
+  const handleCreateTab = useCallback(
+    (name: string, pin?: string) => {
+      const id = `tab_${Date.now().toString(36)}`;
+      const newTab: AppTab = {
+        id,
+        name,
+        kind: 'custom',
+        ...(pin ? { pin } : {}),
+      };
+      const emptyData = createEmptyTabData();
+      saveStorage(`${TAB_DATA_PREFIX}${id}`, emptyData);
+      setTabDataMap((prev) => ({ ...prev, [id]: emptyData }));
+      setTabs((prev) => {
+        const next = [...prev, newTab];
+        saveStorage(TABS_STORAGE_KEY, next);
+        return next;
+      });
+      setTabModalState(null);
+      activateTab(newTab, true);
+    },
+    [activateTab]
+  );
+
+  const handleEditTab = useCallback((tabId: string, name: string, pin?: string) => {
+    setTabs((prev) => {
+      const next = prev.map((t) => {
+        if (t.id !== tabId) return t;
+        const updated: AppTab = {
+          ...t,
+          name: t.kind === 'custom' ? name : t.name,
+        };
+        if (pin) {
+          updated.pin = pin;
+        } else {
+          delete updated.pin;
+        }
+        return updated;
+      });
+      saveStorage(TABS_STORAGE_KEY, next);
+      return next;
+    });
+    setTabModalState(null);
+  }, []);
+
+  const handleDeleteTab = useCallback(
+    (tabId: string) => {
+      const target = tabs.find((t) => t.id === tabId);
+      if (!target || target.kind !== 'custom') return;
+
+      try {
+        localStorage.removeItem(`${TAB_DATA_PREFIX}${tabId}`);
+      } catch {
+        // Ignore storage error
+      }
+
+      const remaining = tabs.filter((t) => t.id !== tabId);
+      saveStorage(TABS_STORAGE_KEY, remaining);
+      setTabs(remaining);
+      setTabModalState(null);
+
+      if (activeTabId === tabId) {
+        const fallback = remaining[0] || DEFAULT_TABS[0];
+        activateTab(fallback, true);
+      }
+    },
+    [activeTabId, activateTab, tabs]
+  );
+
+  const handleUpdateKidsPin = useCallback((pin: string) => {
+    setTabs((prev) => {
+      const next = prev.map((t) => (t.kind === 'kids' ? { ...t, pin } : t));
+      saveStorage(TABS_STORAGE_KEY, next);
+      return next;
+    });
+  }, []);
+
+  const handleSetOrResetTabPin = useCallback((tabId: string, pin?: string) => {
+    setTabs((prev) => {
+      const next = prev.map((t) => {
+        if (t.id !== tabId) return t;
+        const updated: AppTab = { ...t };
+        if (pin) {
+          updated.pin = pin;
+        } else {
+          delete updated.pin;
+        }
+        return updated;
+      });
+      saveStorage(TABS_STORAGE_KEY, next);
+      return next;
+    });
+  }, []);
 
   const handleSearchVideos = useCallback(
     async (q: string, autoplayItem?: MediaItem) => {
@@ -507,24 +809,57 @@ export default function App() {
     }
   }
 
+  // First visit -> Home only. Returning visits -> restore most recent tab & open its Feed directly!
   useEffect(() => {
     const hash = window.location.hash.replace(/^#/, '');
-    if (hash) {
-      const decoded = decodeURIComponent(hash);
+    const decoded = hash ? decodeURIComponent(hash) : '';
+
+    let hasVisitedBefore = false;
+    try {
+      hasVisitedBefore = localStorage.getItem(HAS_VISITED_STORAGE_KEY) === '1';
+      if (!hasVisitedBefore) {
+        localStorage.setItem(HAS_VISITED_STORAGE_KEY, '1');
+      }
+    } catch {
+      hasVisitedBefore = false;
+    }
+
+    if (decoded && decoded !== 'feed') {
       if (decoded === 'liked') {
         setViewMode('liked');
-      } else if (decoded === 'following') {
+        return;
+      }
+      if (decoded === 'following') {
         setViewMode('following');
-      } else if (decoded === 'feed') {
-        setViewMode('feed');
-        loadFeed(null);
-      } else if (decoded.startsWith('search=')) {
+        return;
+      }
+      if (decoded.startsWith('search=')) {
         const sq = decoded.slice('search='.length).trim();
-        if (sq) handleSearchVideos(sq);
+        if (sq) {
+          handleSearchVideos(sq);
+          return;
+        }
       } else if (decoded.trim()) {
         fetchChannel(decoded, 'videos', false);
+        return;
       }
     }
+
+    if (!hasVisitedBefore && decoded !== 'feed') {
+      setViewMode('explore');
+      return;
+    }
+
+    // Returning visitor: restore most recent tab and go straight to its Feed
+    const recentTab = currentTab;
+    if (recentTab.kind !== 'kids' && recentTab.pin) {
+      setPendingUnlockTab({ tab: recentTab, openFeedAfter: true });
+      return;
+    }
+
+    setViewMode('feed');
+    window.history.replaceState(null, '', '#feed');
+    loadFeedForContext(recentTab, currentTabData, null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -630,7 +965,6 @@ export default function App() {
     }
   }
 
-  // Zero scroll jump! Plays right inside clicked card on mobile or Half-Screen Split on laptop.
   function handlePlayItem(item: MediaItem, customQueue?: MediaItem[]) {
     setPlayingLikedQueue(false);
     setPlayerStartSeconds(0);
@@ -712,7 +1046,7 @@ export default function App() {
 
   function handleChangeMode(nextMode: 'videos' | 'music') {
     if (nextMode === appMode) return;
-    setAppMode(nextMode);
+    updateTabData(activeTabId, (prev) => ({ ...prev, appMode: nextMode }));
     setExpandedPlayer(null);
     if (nextMode === 'videos') {
       setPlayingItem(null);
@@ -738,6 +1072,8 @@ export default function App() {
     window.history.replaceState(null, '', '#');
   }
 
+  const isKidsTab = currentTab.kind === 'kids';
+
   return (
     <div className="min-h-screen bg-[#FAF9F7] text-[#111111]">
       <LaptopSidebar
@@ -746,6 +1082,11 @@ export default function App() {
         likedCount={likedItems.length}
         followedChannels={followedChannels}
         activeChannelPath={channel?.path}
+        tabs={tabs}
+        activeTabId={activeTabId}
+        onSelectTab={handleSelectTab}
+        onEditTab={(tab) => setTabModalState({ mode: 'edit', tab })}
+        onCreateTab={() => setTabModalState({ mode: 'create' })}
         onResetHome={handleResetHome}
         onOpenFeed={openFeedView}
         onOpenFollowing={() => {
@@ -767,6 +1108,8 @@ export default function App() {
         followedCount={followedChannels.length}
         activeView={viewMode}
         recentSearches={recentSearches}
+        hasActivePin={Boolean(currentTab.pin)}
+        isKidsTab={isKidsTab}
         onSubmitSearch={(input) => handleSearchVideos(input)}
         onSelectVideoFromDropdown={(video, suggestions, qText) => {
           recordWatch(video);
@@ -777,7 +1120,9 @@ export default function App() {
         }}
         onRemoveRecentSearch={handleRemoveRecentSearch}
         onClearRecentSearches={handleClearRecentSearches}
-        onOpenFeed={openFeedView}
+        onOpenPasswordManager={() =>
+          setPasswordModalTab({ tab: currentTab, activateAfter: false })
+        }
         onOpenFollowing={() => {
           setViewMode('following');
           window.history.replaceState(null, '', '#following');
@@ -794,6 +1139,10 @@ export default function App() {
           current={expandedPlayer.item}
           initialRotation={expandedPlayer.initialRotation}
           startSeconds={expandedPlayer.startSeconds ?? 0}
+          isKidsTab={isKidsTab}
+          kidsPin={isKidsTab ? currentTab.pin : undefined}
+          initialLocked={expandedPlayer.lockOnOpen}
+          onSaveKidsPin={handleUpdateKidsPin}
           onSwitchHalf={
             isDesktop
               ? (sec) => {
@@ -825,7 +1174,24 @@ export default function App() {
         />
       )}
 
-      <div className="lg:pl-60 xl:pl-64">
+      {(() => {
+        const isStartupLocked = Boolean(
+          pendingUnlockTab &&
+            pendingUnlockTab.tab.id === activeTabId &&
+            currentTab.kind !== 'kids' &&
+            currentTab.pin
+        );
+        if (isStartupLocked) {
+          return (
+            <div className="flex min-h-[60vh] items-center justify-center px-4 text-center lg:pl-60 xl:pl-64">
+              <p className="text-sm text-[#5C5A55]">
+                Enter PIN to unlock &ldquo;{currentTab.name}&rdquo; tab.
+              </p>
+            </div>
+          );
+        }
+        return (
+          <div className="lg:pl-60 xl:pl-64">
         {error && viewMode === 'channel' && channel && (
           <div className="mx-auto max-w-[1440px] px-3 pt-4 sm:px-6">
             <div
@@ -841,6 +1207,7 @@ export default function App() {
           <SearchResultsView
             appMode={appMode}
             isDesktop={isDesktop}
+            isKidsTab={isKidsTab}
             searchQuery={searchQuery}
             videos={searchVideosList}
             channels={searchChannelsList}
@@ -860,8 +1227,8 @@ export default function App() {
             onPrev={goPrev}
             onNext={() => advanceToNext(true)}
             onEnded={() => advanceToNext(false)}
-            onExpandFull={(item, initialRotation, sec) =>
-              setExpandedPlayer({ item, initialRotation, startSeconds: sec })
+            onExpandFull={(item, initialRotation, sec, lockOnOpen) =>
+              setExpandedPlayer({ item, initialRotation, startSeconds: sec, lockOnOpen })
             }
             onToggleLike={handleToggleLike}
             onOpenChannel={(path) => fetchChannel(path, 'videos', false)}
@@ -879,6 +1246,8 @@ export default function App() {
           <FeedView
             appMode={appMode}
             isDesktop={isDesktop}
+            isKidsTab={isKidsTab}
+            activeTabName={currentTab.name}
             items={feedItems}
             seeds={feedSeedInfo.seeds}
             activeSeed={activeFeedSeed}
@@ -902,8 +1271,8 @@ export default function App() {
             onPrev={goPrev}
             onNext={() => advanceToNext(true)}
             onEnded={() => advanceToNext(false)}
-            onExpandFull={(item, initialRotation, sec) =>
-              setExpandedPlayer({ item, initialRotation, startSeconds: sec })
+            onExpandFull={(item, initialRotation, sec, lockOnOpen) =>
+              setExpandedPlayer({ item, initialRotation, startSeconds: sec, lockOnOpen })
             }
             onToggleLike={handleToggleLike}
             onOpenChannel={(path) => fetchChannel(path, 'videos', false)}
@@ -935,6 +1304,7 @@ export default function App() {
           <LikedPlaylistView
             appMode={appMode}
             isDesktop={isDesktop}
+            isKidsTab={isKidsTab}
             likedItems={likedItems}
             playingItem={playingItem}
             startSeconds={playerStartSeconds}
@@ -949,8 +1319,8 @@ export default function App() {
             onPrev={goPrev}
             onNext={() => advanceToNext(true)}
             onEnded={() => advanceToNext(false)}
-            onExpandFull={(item, initialRotation, sec) =>
-              setExpandedPlayer({ item, initialRotation, startSeconds: sec })
+            onExpandFull={(item, initialRotation, sec, lockOnOpen) =>
+              setExpandedPlayer({ item, initialRotation, startSeconds: sec, lockOnOpen })
             }
             onToggleAutoPlay={() => setAutoPlayNext((v) => !v)}
             onToggleLoop={() => setLoopQueue((v) => !v)}
@@ -969,6 +1339,7 @@ export default function App() {
           <ChannelView
             appMode={appMode}
             isDesktop={isDesktop}
+            isKidsTab={isKidsTab}
             channel={channel}
             activeTab={activeTab}
             items={items}
@@ -1003,8 +1374,8 @@ export default function App() {
             onPrev={goPrev}
             onNext={() => advanceToNext(true)}
             onEnded={() => advanceToNext(false)}
-            onExpandFull={(item, initialRotation, sec) =>
-              setExpandedPlayer({ item, initialRotation, startSeconds: sec })
+            onExpandFull={(item, initialRotation, sec, lockOnOpen) =>
+              setExpandedPlayer({ item, initialRotation, startSeconds: sec, lockOnOpen })
             }
             onOpenPlaylist={handleOpenPlaylist}
             onClosePlaylist={() => setActivePlaylist(null)}
@@ -1035,7 +1406,106 @@ export default function App() {
             }}
           />
         )}
-      </div>
+          </div>
+        );
+      })()}
+
+      <BottomNav
+        tabs={tabs}
+        activeTabId={activeTabId}
+        activeView={viewMode}
+        onOpenFeed={openFeedView}
+        onSelectTab={handleSelectTab}
+        onEditTab={(tab) => setTabModalState({ mode: 'edit', tab })}
+        onCreateTab={() => setTabModalState({ mode: 'create' })}
+      />
+
+      {pendingUnlockTab && (
+        <PinModal
+          mode="verify"
+          title={`Unlock "${pendingUnlockTab.tab.name}" Tab`}
+          subtitle="Enter 1–4 digit PIN to open this tab"
+          expectedPin={pendingUnlockTab.tab.pin}
+          allowForgotReset={true}
+          onForgotReset={() => {
+            const target = pendingUnlockTab;
+            setPendingUnlockTab(null);
+            setPasswordModalTab({ tab: target.tab, activateAfter: true });
+          }}
+          onSuccess={() => {
+            const target = pendingUnlockTab;
+            setPendingUnlockTab(null);
+            activateTab(target.tab, target.openFeedAfter);
+          }}
+          onCancel={() => {
+            setPendingUnlockTab(null);
+            // If locked on startup before switching, fall back safely to Kids or an unlocked tab
+            if (activeTabId === pendingUnlockTab.tab.id && currentTab.pin && currentTab.kind !== 'kids') {
+              const unlockedTab =
+                tabs.find((t) => t.kind === 'kids' || !t.pin) || DEFAULT_TABS[1];
+              activateTab(unlockedTab, true);
+            }
+          }}
+        />
+      )}
+
+      {passwordModalTab && (
+        <PinModal
+          mode="setup"
+          title={
+            passwordModalTab.tab.kind === 'kids'
+              ? 'Kids Screen Lock PIN'
+              : `New PIN for "${passwordModalTab.tab.name}"`
+          }
+          subtitle={
+            passwordModalTab.tab.kind === 'kids'
+              ? 'Set or change 1–4 digit PIN beforehand (locks video touches)'
+              : 'Forgot old PIN? Just enter any new 1–4 digit PIN anytime'
+          }
+          canRemove={Boolean(passwordModalTab.tab.pin)}
+          onSuccess={(newPin) => {
+            const { tab, activateAfter } = passwordModalTab;
+            handleSetOrResetTabPin(tab.id, newPin);
+            setPasswordModalTab(null);
+            if (activateAfter) {
+              activateTab({ ...tab, pin: newPin }, true);
+            }
+          }}
+          onRemovePin={() => {
+            const { tab, activateAfter } = passwordModalTab;
+            handleSetOrResetTabPin(tab.id, undefined);
+            setPasswordModalTab(null);
+            if (activateAfter) {
+              activateTab({ ...tab, pin: undefined }, true);
+            }
+          }}
+          onCancel={() => {
+            const wasStartupLocked = Boolean(
+              passwordModalTab.activateAfter &&
+                activeTabId === passwordModalTab.tab.id &&
+                currentTab.pin &&
+                currentTab.kind !== 'kids'
+            );
+            setPasswordModalTab(null);
+            if (wasStartupLocked) {
+              const unlockedTab =
+                tabs.find((t) => t.kind === 'kids' || !t.pin) || DEFAULT_TABS[1];
+              activateTab(unlockedTab, true);
+            }
+          }}
+        />
+      )}
+
+      {tabModalState && (
+        <TabModal
+          mode={tabModalState.mode}
+          tab={tabModalState.tab}
+          onSaveCreate={handleCreateTab}
+          onSaveEdit={handleEditTab}
+          onDeleteTab={handleDeleteTab}
+          onClose={() => setTabModalState(null)}
+        />
+      )}
 
       <OfflineIndicator />
     </div>

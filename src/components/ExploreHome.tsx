@@ -58,7 +58,7 @@ export function ExploreHome({
   }
 
   return (
-    <main className="mx-auto max-w-[1120px] px-4 pb-24 pt-7 sm:px-6 sm:pt-10 lg:pt-12">
+    <main className="mx-auto max-w-[1120px] px-4 pb-36 pt-7 sm:px-6 sm:pt-10 lg:pb-24 lg:pt-12">
       {/* Top Mode Switch: Videos (default) vs Music */}
       <div className="mb-7 flex items-center justify-between gap-4 sm:mb-9">
         <div

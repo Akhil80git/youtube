@@ -106,3 +106,27 @@ export interface ChannelSearchResult {
   subscribersText: string;
   description: string;
 }
+
+export interface RecentChannel {
+  title: string;
+  handle: string;
+  path: string;
+  avatar: string;
+}
+
+export interface AppTab {
+  id: string;
+  name: string;
+  kind: 'default' | 'kids' | 'custom';
+  pin?: string;
+}
+
+export interface TabDataState {
+  appMode: 'videos' | 'music';
+  recentChannels: RecentChannel[];
+  recentSearches: string[];
+  likedItems: LikedItem[];
+  followedChannels: FollowedChannel[];
+  watchHistory: MediaItem[];
+}
+

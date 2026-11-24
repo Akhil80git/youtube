@@ -2,6 +2,7 @@ import { Heart, ListVideo, Maximize2, Play, RotateCw, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { MediaItem, PlaylistCard } from '../types';
 import {
+  disableYouTubeCaptions,
   ensureYouTubeIframeApi,
   isValidVideoId,
   type YTPlayerInstance,
@@ -11,6 +12,7 @@ interface MediaCardProps {
   item: MediaItem;
   isPlaying: boolean;
   suppressInlineFrame?: boolean;
+  isKidsTab?: boolean;
   isLiked: boolean;
   onPlay: (item: MediaItem) => void;
   onStopPlay: () => void;
@@ -63,16 +65,25 @@ function InlineCardPlayer({
           rel: 0,
           modestbranding: 1,
           playsinline: 1,
+          cc_load_policy: 0,
+          iv_load_policy: 3,
         },
         events: {
           onReady: (e) => {
+            disableYouTubeCaptions(e.target);
             try {
               e.target.playVideo();
             } catch {
               // ignore autoplay restriction
             }
           },
+          onApiChange: (e) => {
+            disableYouTubeCaptions(e.target);
+          },
           onStateChange: (e) => {
+            if (e.data === 1 || e.data === 3 || e.data === 5) {
+              disableYouTubeCaptions(e.target);
+            }
             if (e.data === 0) {
               onEndedRef.current();
             }
@@ -105,7 +116,7 @@ function InlineCardPlayer({
           ? '-rotate-90 scale-[0.5625]'
           : '';
 
-  const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
+  const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&cc_load_policy=0&iv_load_policy=3`;
 
   return (
     <div className="flex h-full w-full items-center justify-center overflow-hidden bg-black">
@@ -130,6 +141,7 @@ export function MediaCard({
   item,
   isPlaying,
   suppressInlineFrame = false,
+  isKidsTab = false,
   isLiked,
   onPlay,
   onStopPlay,
@@ -152,7 +164,7 @@ export function MediaCard({
       window.innerWidth < 768 &&
       window.innerHeight > window.innerWidth;
 
-    if (isPortraitMobile) {
+    if (isPortraitMobile || isKidsTab) {
       onExpandFull(item, 90);
       return;
     }

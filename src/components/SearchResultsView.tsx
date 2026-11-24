@@ -7,6 +7,7 @@ import { MusicTrackRow } from './MusicTrackRow';
 interface SearchResultsViewProps {
   appMode: 'videos' | 'music';
   isDesktop: boolean;
+  isKidsTab?: boolean;
   searchQuery: string;
   videos: MediaItem[];
   channels: ChannelSearchResult[];
@@ -29,7 +30,8 @@ interface SearchResultsViewProps {
   onExpandFull: (
     item: MediaItem,
     initialRotation: 0 | 90 | 180 | 270,
-    startSeconds?: number
+    startSeconds?: number,
+    lockOnOpen?: boolean
   ) => void;
   onToggleLike: (item: MediaItem) => void;
   onOpenChannel: (path: string) => void;
@@ -40,6 +42,7 @@ interface SearchResultsViewProps {
 export function SearchResultsView({
   appMode,
   isDesktop,
+  isKidsTab = false,
   searchQuery,
   videos,
   channels,
@@ -69,7 +72,7 @@ export function SearchResultsView({
     isDesktop && appMode === 'videos' && Boolean(playingItem) && !hasExpandedPlayer;
 
   return (
-    <main className="mx-auto max-w-[1440px] px-3 pb-24 pt-5 sm:px-6 sm:pt-6">
+    <main className="mx-auto max-w-[1440px] px-3 pb-36 pt-5 sm:px-6 sm:pt-6 lg:pb-24">
       <div className="flex flex-col gap-4 border-b border-[#E5E3DD] pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <button
@@ -201,6 +204,7 @@ export function SearchResultsView({
                     startSeconds={startSeconds}
                     hasPrev={hasPrev}
                     hasNext={hasNext}
+                    isKidsTab={isKidsTab}
                     isLiked={isLiked}
                     hasMore={hasMore}
                     loadingMore={loadingMore}
@@ -211,6 +215,7 @@ export function SearchResultsView({
                     onEnded={onEnded}
                     onToggleLike={onToggleLike}
                     onOpenFull={(sec) => onExpandFull(playingItem, 0, sec)}
+                    onLockKidsScreen={(sec) => onExpandFull(playingItem, 0, sec, true)}
                     onClose={onStopPlay}
                     onOpenChannel={onOpenChannel}
                   />
@@ -223,6 +228,7 @@ export function SearchResultsView({
                       item={item}
                       isPlaying={playingItem?.id === item.id}
                       suppressInlineFrame={hasExpandedPlayer || isDesktop}
+                      isKidsTab={isKidsTab}
                       isLiked={isLiked(item.id)}
                       onPlay={(clicked) => onPlayItem(clicked, videos)}
                       onStopPlay={onStopPlay}

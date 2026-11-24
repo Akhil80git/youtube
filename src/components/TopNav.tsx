@@ -2,8 +2,10 @@ import {
   ArrowLeft,
   ArrowRight,
   Clock,
-  Compass,
   Heart,
+  KeyRound,
+  Mic,
+  MicOff,
   Play,
   Search,
   Users,
@@ -14,6 +16,34 @@ import type { MediaItem, SearchVideosResponse } from '../types';
 import { safeFetchJson } from '../utils/api';
 import { PWAInstallButton } from './PWAInstallButton';
 
+interface SpeechRecognitionAlternativeLike {
+  transcript: string;
+}
+
+interface SpeechRecognitionResultLike {
+  isFinal: boolean;
+  0: SpeechRecognitionAlternativeLike;
+}
+
+interface SpeechRecognitionEventLike {
+  results: ArrayLike<SpeechRecognitionResultLike>;
+}
+
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  maxAlternatives: number;
+  onresult: ((e: SpeechRecognitionEventLike) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
 interface TopNavProps {
   query: string;
   loading: boolean;
@@ -21,11 +51,13 @@ interface TopNavProps {
   followedCount: number;
   activeView: 'explore' | 'feed' | 'search' | 'channel' | 'following' | 'liked';
   recentSearches: string[];
+  hasActivePin?: boolean;
+  isKidsTab?: boolean;
   onSubmitSearch: (input: string) => void;
   onSelectVideoFromDropdown: (video: MediaItem, suggestions: MediaItem[], queryText: string) => void;
   onRemoveRecentSearch: (q: string) => void;
   onClearRecentSearches: () => void;
-  onOpenFeed: () => void;
+  onOpenPasswordManager: () => void;
   onOpenFollowing: () => void;
   onOpenLiked: () => void;
   onResetHome: () => void;
@@ -38,11 +70,13 @@ export function TopNav({
   followedCount,
   activeView,
   recentSearches,
+  hasActivePin = false,
+  isKidsTab = false,
   onSubmitSearch,
   onSelectVideoFromDropdown,
   onRemoveRecentSearch,
   onClearRecentSearches,
-  onOpenFeed,
+  onOpenPasswordManager,
   onOpenFollowing,
   onOpenLiked,
   onResetHome,
@@ -51,12 +85,22 @@ export function TopNav({
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [videoSuggestions, setVideoSuggestions] = useState<MediaItem[]>([]);
   const [searching, setSearching] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceUnsupported, setVoiceUnsupported] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   useEffect(() => {
     setInput(query);
   }, [query]);
+
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.abort();
+      recognitionRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -105,6 +149,72 @@ export function TopNav({
     });
   }
 
+  function handleVoiceSearch() {
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const win = window as unknown as {
+      SpeechRecognition?: SpeechRecognitionCtor;
+      webkitSpeechRecognition?: SpeechRecognitionCtor;
+    };
+    const Recognition = win.SpeechRecognition || win.webkitSpeechRecognition;
+
+    if (!Recognition) {
+      setVoiceUnsupported(true);
+      setTimeout(() => setVoiceUnsupported(false), 3000);
+      return;
+    }
+
+    try {
+      const recognition = new Recognition();
+      recognition.lang = navigator.language || 'en-IN';
+      recognition.interimResults = true;
+      recognition.continuous = false;
+      recognition.maxAlternatives = 1;
+
+      recognitionRef.current = recognition;
+      setSearchExpanded(true);
+      setIsListening(true);
+
+      recognition.onresult = (event) => {
+        let transcript = '';
+        let hasFinal = false;
+        for (let i = 0; i < event.results.length; i++) {
+          const res = event.results[i];
+          if (res?.[0]?.transcript) {
+            transcript += res[0].transcript;
+          }
+          if (res?.isFinal) hasFinal = true;
+        }
+        const cleaned = transcript.trim();
+        if (cleaned) {
+          setInput(cleaned);
+          if (hasFinal) {
+            setIsListening(false);
+            setSearchExpanded(false);
+            inputRef.current?.blur();
+            onSubmitSearch(cleaned);
+          }
+        }
+      };
+
+      recognition.onerror = () => {
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.start();
+    } catch {
+      setIsListening(false);
+    }
+  }
+
   function handleFormSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = input.trim();
@@ -139,17 +249,17 @@ export function TopNav({
   return (
     <header className="sticky top-0 z-30 border-b border-[#E5E3DD] bg-white/95 backdrop-blur-md lg:pl-60 xl:pl-64">
       <div className="mx-auto max-w-[1440px] px-3 sm:px-6">
-        <div className="flex h-14 items-center justify-between gap-2 sm:h-16 sm:gap-4">
+        <div className="flex h-11 items-center justify-between gap-2 sm:h-12 sm:gap-4">
           {/* Brand Logo (shown on mobile/tablet; laptop displays logo in vertical sidebar) */}
           <button
             type="button"
             onClick={onResetHome}
-            className={`font-display shrink-0 cursor-pointer items-center gap-1.5 text-base font-bold tracking-tight text-[#111111] transition-colors hover:text-[#E11D48] sm:text-xl whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#E11D48] lg:hidden ${
+            className={`font-display shrink-0 cursor-pointer items-center gap-1.5 text-base font-bold tracking-tight text-[#111111] transition-colors hover:text-[#E11D48] sm:text-lg whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#E11D48] lg:hidden ${
               searchExpanded ? 'hidden sm:inline-flex' : 'inline-flex'
             }`}
           >
-            <span className="inline-flex h-6 w-7 items-center justify-center rounded-md bg-[#E11D48] text-white sm:h-6 sm:w-8">
-              <Play className="h-3.5 w-3.5 translate-x-[0.5px] fill-current" />
+            <span className="inline-flex h-5 w-6 items-center justify-center rounded-md bg-[#E11D48] text-white sm:h-6 sm:w-7">
+              <Play className="h-3 w-3 translate-x-[0.5px] fill-current" />
             </span>
             <span>youtube</span>
           </button>
@@ -164,29 +274,44 @@ export function TopNav({
             }`}
           >
             {!searchExpanded ? (
-              <button
-                type="button"
-                onClick={expandSearch}
-                aria-label="Search videos and songs"
-                className="flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg border border-[#E5E3DD] bg-[#FAF9F7] px-2.5 text-left text-xs text-[#73716C] transition-colors hover:border-[#111111] hover:bg-white sm:h-10 sm:px-3 sm:text-sm"
-              >
-                <Search className="h-3.5 w-3.5 shrink-0 text-[#73716C]" aria-hidden="true" />
-                <span className="truncate">{trimmedInput ? trimmedInput : 'Search...'}</span>
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={expandSearch}
+                  aria-label="Search videos and songs"
+                  className="flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg border border-[#E5E3DD] bg-[#FAF9F7] px-2.5 text-left text-xs text-[#73716C] transition-colors hover:border-[#111111] hover:bg-white sm:h-9 sm:px-3 sm:text-sm"
+                >
+                  <Search className="h-3.5 w-3.5 shrink-0 text-[#73716C]" aria-hidden="true" />
+                  <span className="truncate">{trimmedInput ? trimmedInput : 'Search...'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleVoiceSearch}
+                  title="Voice search"
+                  aria-label="Voice search by speaking"
+                  className={`inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border transition-colors sm:h-9 sm:w-9 ${
+                    isListening
+                      ? 'animate-pulse border-[#E11D48] bg-[#E11D48] text-white'
+                      : 'border-[#E5E3DD] bg-[#FAF9F7] text-[#111111] hover:border-[#111111] hover:bg-white'
+                  }`}
+                >
+                  <Mic className="h-3.5 w-3.5" />
+                </button>
+              </div>
             ) : (
               <form onSubmit={handleFormSubmit} className="flex items-center gap-1.5 sm:gap-2">
                 <button
                   type="button"
                   onClick={() => setSearchExpanded(false)}
                   aria-label="Collapse search"
-                  className="inline-flex h-10 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-[#E5E3DD] bg-white text-[#5C5A55] hover:border-[#111111] hover:text-[#111111] sm:hidden"
+                  className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-[#E5E3DD] bg-white text-[#5C5A55] hover:border-[#111111] hover:text-[#111111] sm:hidden"
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </button>
 
                 <div className="relative flex-1">
                   <Search
-                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#73716C]"
+                    className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#73716C]"
                     aria-hidden="true"
                   />
                   <input
@@ -198,9 +323,9 @@ export function TopNav({
                       if (e.key === 'Escape') setSearchExpanded(false);
                     }}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Search videos, songs, reels..."
+                    placeholder={isListening ? 'Listening... speak now' : 'Search videos, songs, reels...'}
                     aria-label="Search videos, songs, or reels"
-                    className="h-10 w-full rounded-lg border border-[#111111] bg-white pl-9 pr-8 text-sm text-[#111111] placeholder:text-[#73716C] focus:outline-none"
+                    className="h-8 w-full rounded-lg border border-[#111111] bg-white pl-8 pr-8 text-sm text-[#111111] placeholder:text-[#73716C] focus:outline-none sm:h-9"
                   />
                   {input && (
                     <button
@@ -211,7 +336,7 @@ export function TopNav({
                         inputRef.current?.focus();
                       }}
                       aria-label="Clear search"
-                      className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded text-[#73716C] hover:bg-[#E5E3DD]/60 hover:text-[#111111]"
+                      className="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded text-[#73716C] hover:bg-[#E5E3DD]/60 hover:text-[#111111]"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -219,17 +344,37 @@ export function TopNav({
                 </div>
 
                 <button
+                  type="button"
+                  onClick={handleVoiceSearch}
+                  title={isListening ? 'Stop listening' : 'Speak to search'}
+                  aria-label={isListening ? 'Stop voice search' : 'Speak to search'}
+                  className={`inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border transition-colors sm:h-9 sm:w-9 ${
+                    isListening
+                      ? 'animate-pulse border-[#E11D48] bg-[#E11D48] text-white'
+                      : 'border-[#E5E3DD] bg-[#FAF9F7] text-[#111111] hover:border-[#111111] hover:bg-white'
+                  }`}
+                >
+                  {isListening ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                </button>
+
+                <button
                   type="submit"
                   disabled={loading || !trimmedInput}
-                  className="inline-flex h-10 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-[#111111] px-3.5 text-sm font-medium text-white transition-colors hover:bg-[#E11D48] disabled:cursor-not-allowed disabled:opacity-45 whitespace-nowrap"
+                  className="inline-flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-[#111111] px-3 text-xs font-medium text-white transition-colors hover:bg-[#E11D48] disabled:cursor-not-allowed disabled:opacity-45 sm:h-9 sm:text-sm whitespace-nowrap"
                 >
                   {loading ? '...' : 'Go'}
                 </button>
               </form>
             )}
 
+            {voiceUnsupported && (
+              <div className="absolute left-0 top-10 z-50 rounded-lg border border-[#E5E3DD] bg-[#111111] px-3 py-1.5 text-[11px] font-medium text-white shadow-md">
+                Voice search not supported in this browser
+              </div>
+            )}
+
             {showDropdown && (
-              <div className="absolute left-0 right-0 top-11 z-50 overflow-hidden rounded-xl border border-[#E5E3DD] bg-white shadow-lg">
+              <div className="absolute left-0 right-0 top-10 z-50 overflow-hidden rounded-xl border border-[#E5E3DD] bg-white shadow-lg">
                 {/* Real Search History when clicked */}
                 {trimmedInput.length === 0 && filteredRecent.length > 0 && (
                   <div>
@@ -343,44 +488,55 @@ export function TopNav({
             )}
           </div>
 
-          {/* Right Actions: PWA Install + Mobile Icon Actions (Feed, Following, Liked moved to LaptopSidebar on lg+) */}
+          {/* Right Actions: Password PIN icon + PWA Install + Mobile Icon Actions */}
           <div
             className={`shrink-0 items-center gap-1.5 sm:gap-2 ${
               searchExpanded ? 'hidden sm:flex' : 'flex'
             }`}
           >
+            <button
+              type="button"
+              onClick={onOpenPasswordManager}
+              title={
+                isKidsTab
+                  ? hasActivePin
+                    ? 'Change or reset Kids Screen Lock PIN'
+                    : 'Set Kids Screen Lock PIN beforehand'
+                  : hasActivePin
+                    ? 'Change or reset Tab PIN'
+                    : 'Set Tab PIN password'
+              }
+              aria-label="Set or reset PIN password"
+              className={`relative inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border transition-colors sm:h-9 sm:w-9 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E11D48] ${
+                hasActivePin
+                  ? 'border-[#111111] bg-[#111111] text-white hover:bg-[#E11D48] hover:border-[#E11D48]'
+                  : 'border-[#E5E3DD] bg-white text-[#111111] hover:border-[#111111]'
+              }`}
+            >
+              <KeyRound className="h-3.5 w-3.5" />
+              {hasActivePin && (
+                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[#E11D48] ring-2 ring-white" />
+              )}
+            </button>
+
             <PWAInstallButton variant="compact" />
 
             <div className="flex items-center gap-1.5 sm:gap-2 lg:hidden">
               <button
                 type="button"
-                onClick={onOpenFeed}
-                title="Feed (For You)"
-                aria-label="Open personalized Feed"
-                className={`relative inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border transition-colors sm:h-10 sm:w-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E11D48] ${
-                  activeView === 'feed'
-                    ? 'border-[#111111] bg-[#111111] text-white'
-                    : 'border-[#E5E3DD] bg-white text-[#111111] hover:border-[#111111]'
-                }`}
-              >
-                <Compass className="h-4 w-4" />
-              </button>
-
-              <button
-                type="button"
                 onClick={onOpenFollowing}
                 title={`Following (${followedCount})`}
                 aria-label={`Followed channels (${followedCount})`}
-                className={`relative inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border transition-colors sm:h-10 sm:w-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E11D48] ${
+                className={`relative inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border transition-colors sm:h-9 sm:w-9 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E11D48] ${
                   activeView === 'following'
                     ? 'border-[#111111] bg-[#111111] text-white'
                     : 'border-[#E5E3DD] bg-white text-[#111111] hover:border-[#111111]'
                 }`}
               >
-                <Users className="h-4 w-4" />
+                <Users className="h-3.5 w-3.5" />
                 {followedCount > 0 && (
                   <span
-                    className={`absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 font-mono text-[10px] font-semibold leading-none tabular-nums ${
+                    className={`absolute -right-1 -top-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full px-1 font-mono text-[9px] font-semibold leading-none tabular-nums ${
                       activeView === 'following'
                         ? 'bg-[#E11D48] text-white'
                         : 'bg-[#111111] text-white'
@@ -396,20 +552,20 @@ export function TopNav({
                 onClick={onOpenLiked}
                 title={`Liked (${likedCount})`}
                 aria-label={`Open Liked Playlist (${likedCount} items)`}
-                className={`relative inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border transition-colors sm:h-10 sm:w-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E11D48] ${
+                className={`relative inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border transition-colors sm:h-9 sm:w-9 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E11D48] ${
                   activeView === 'liked'
                     ? 'border-[#E11D48] bg-[#E11D48] text-white'
                     : 'border-[#E5E3DD] bg-white text-[#111111] hover:border-[#111111]'
                 }`}
               >
                 <Heart
-                  className={`h-4 w-4 ${
+                  className={`h-3.5 w-3.5 ${
                     activeView === 'liked' || likedCount > 0 ? 'fill-current' : ''
                   } ${activeView !== 'liked' && likedCount > 0 ? 'text-[#E11D48]' : ''}`}
                 />
                 {likedCount > 0 && (
                   <span
-                    className={`absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 font-mono text-[10px] font-semibold leading-none tabular-nums ${
+                    className={`absolute -right-1 -top-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full px-1 font-mono text-[9px] font-semibold leading-none tabular-nums ${
                       activeView === 'liked'
                         ? 'bg-[#111111] text-white'
                         : 'bg-[#E11D48] text-white'
