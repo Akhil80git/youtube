@@ -1,13 +1,15 @@
-import { ArrowRight, Heart, Play, Search } from 'lucide-react';
+import { ArrowRight, Heart, Play, Search, Users } from 'lucide-react';
 import { useState } from 'react';
-import type { LikedItem } from '../types';
+import type { FollowedChannel, LikedItem } from '../types';
 
 interface ExploreHomeProps {
   loading: boolean;
   error: string | null;
   likedItems: LikedItem[];
+  followedChannels: FollowedChannel[];
   recentChannels: { title: string; handle: string; path: string; avatar: string }[];
   onSubmitChannel: (input: string) => void;
+  onOpenFollowing: () => void;
   onOpenLiked: () => void;
   onPlayLikedAll: () => void;
 }
@@ -25,8 +27,10 @@ export function ExploreHome({
   loading,
   error,
   likedItems,
+  followedChannels,
   recentChannels,
   onSubmitChannel,
+  onOpenFollowing,
   onOpenLiked,
   onPlayLikedAll,
 }: ExploreHomeProps) {
@@ -46,8 +50,8 @@ export function ExploreHome({
           Any channel, all videos, zero clutter.
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-[#5C5A55] sm:mt-4 sm:text-lg">
-          Enter any YouTube channel handle, URL, or name. Like your favorite videos or music
-          tracks to build an instant auto-playing playlist — free, with no API keys.
+          Enter any YouTube channel handle, URL, or name. Follow your favorite channels, like
+          tracks to build an auto-playing playlist, and watch right here — free, with no API keys.
         </p>
       </div>
 
@@ -85,41 +89,114 @@ export function ExploreHome({
         </div>
       )}
 
-      {likedItems.length > 0 && (
-        <section className="mt-10 rounded-2xl border border-[#E5E3DD] bg-white p-4 sm:p-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3.5">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#E11D48]/10 text-[#E11D48]">
-                <Heart className="h-5 w-5 fill-current" />
+      {/* Quick cards for Liked Playlist & Followed Channels */}
+      {(likedItems.length > 0 || followedChannels.length > 0) && (
+        <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-2">
+          {likedItems.length > 0 && (
+            <section className="flex flex-col justify-between gap-4 rounded-2xl border border-[#E5E3DD] bg-white p-4 sm:p-5">
+              <div className="flex items-center gap-3.5">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#E11D48]/10 text-[#E11D48]">
+                  <Heart className="h-5 w-5 fill-current" />
+                </div>
+                <div>
+                  <h2 className="font-display text-base font-bold text-[#111111]">
+                    Your Liked Playlist
+                  </h2>
+                  <p className="text-xs tabular-nums text-[#5C5A55]">
+                    {likedItems.length} {likedItems.length === 1 ? 'track' : 'tracks'} · Ready
+                    for continuous auto-play
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="font-display text-base font-bold text-[#111111]">
-                  Your Liked Playlist
-                </h2>
-                <p className="text-xs tabular-nums text-[#5C5A55]">
-                  {likedItems.length} {likedItems.length === 1 ? 'track' : 'tracks'} saved · Ready
-                  for continuous auto-play
-                </p>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={onPlayLikedAll}
+                  className="inline-flex h-10 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#E11D48] px-4 text-xs font-medium text-white transition-colors hover:bg-[#BE123C] whitespace-nowrap"
+                >
+                  <Play className="h-3.5 w-3.5 fill-current" />
+                  <span>Play All</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenLiked}
+                  className="inline-flex h-10 flex-1 cursor-pointer items-center justify-center rounded-lg border border-[#E5E3DD] bg-white px-4 text-xs font-medium text-[#111111] transition-colors hover:border-[#111111] whitespace-nowrap"
+                >
+                  Open Playlist
+                </button>
+              </div>
+            </section>
+          )}
+
+          {followedChannels.length > 0 && (
+            <section className="flex flex-col justify-between gap-4 rounded-2xl border border-[#E5E3DD] bg-white p-4 sm:p-5">
+              <div className="flex items-center gap-3.5">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#111111] text-white">
+                  <Users className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="font-display text-base font-bold text-[#111111]">
+                    Followed Channels
+                  </h2>
+                  <p className="text-xs tabular-nums text-[#5C5A55]">
+                    {followedChannels.length}{' '}
+                    {followedChannels.length === 1 ? 'channel' : 'channels'} saved
+                  </p>
+                </div>
+              </div>
+
               <button
                 type="button"
-                onClick={onPlayLikedAll}
-                className="inline-flex h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#E11D48] px-4 text-sm font-medium text-white transition-colors hover:bg-[#BE123C] sm:h-10 sm:flex-initial whitespace-nowrap"
+                onClick={onOpenFollowing}
+                className="inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#111111] px-4 text-xs font-medium text-white transition-colors hover:bg-[#E11D48] whitespace-nowrap"
               >
-                <Play className="h-4 w-4 fill-current" />
-                <span>Play All</span>
+                <span>View Followed Channels</span>
+                <ArrowRight className="h-3.5 w-3.5" />
               </button>
+            </section>
+          )}
+        </div>
+      )}
+
+      {followedChannels.length > 0 && (
+        <section className="mt-10 border-t border-[#E5E3DD] pt-7 sm:mt-12 sm:pt-8">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-sm font-semibold text-[#111111]">Following</h2>
+            <button
+              type="button"
+              onClick={onOpenFollowing}
+              className="cursor-pointer text-xs font-medium text-[#5C5A55] hover:text-[#111111]"
+            >
+              See all
+            </button>
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
+            {followedChannels.slice(0, 6).map((ch) => (
               <button
+                key={ch.id}
                 type="button"
-                onClick={onOpenLiked}
-                className="inline-flex h-11 flex-1 cursor-pointer items-center justify-center rounded-lg border border-[#E5E3DD] bg-white px-4 text-sm font-medium text-[#111111] transition-colors hover:border-[#111111] sm:h-10 sm:flex-initial whitespace-nowrap"
+                onClick={() => onSubmitChannel(ch.path)}
+                className="flex min-h-[60px] cursor-pointer items-center gap-3 rounded-xl border border-[#E5E3DD] bg-white p-3.5 text-left transition-colors hover:border-[#111111]"
               >
-                Open Playlist
+                {ch.avatar ? (
+                  <img
+                    src={ch.avatar}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    className="h-10 w-10 shrink-0 rounded-full bg-[#F2F0EC] object-cover"
+                  />
+                ) : (
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#111111] font-display text-sm font-bold text-white">
+                    {ch.title.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold text-[#111111]">{ch.title}</div>
+                  <div className="truncate text-xs text-[#73716C]">{ch.handle}</div>
+                </div>
               </button>
-            </div>
+            ))}
           </div>
         </section>
       )}

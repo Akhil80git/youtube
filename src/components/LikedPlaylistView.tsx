@@ -1,4 +1,4 @@
-import { ArrowLeft, Heart, Play, Search, Shuffle, Trash2 } from 'lucide-react';
+import { ArrowLeft, Heart, Play, Repeat, Search, Shuffle, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { LikedItem, MediaItem } from '../types';
 import { MediaCard } from './MediaCard';
@@ -6,8 +6,16 @@ import { MediaCard } from './MediaCard';
 interface LikedPlaylistViewProps {
   likedItems: LikedItem[];
   playingItem: MediaItem | null;
+  hasExpandedPlayer: boolean;
+  autoPlayNext: boolean;
+  loopQueue: boolean;
   hasChannelOpen: boolean;
   onPlayTrack: (item: MediaItem, shuffle?: boolean) => void;
+  onStopPlay: () => void;
+  onEnded: () => void;
+  onExpandFull: (item: MediaItem, initialRotation: 0 | 90 | 180 | 270) => void;
+  onToggleAutoPlay: () => void;
+  onToggleLoop: () => void;
   onToggleLike: (item: MediaItem) => void;
   onClearAll: () => void;
   onBack: () => void;
@@ -16,8 +24,16 @@ interface LikedPlaylistViewProps {
 export function LikedPlaylistView({
   likedItems,
   playingItem,
+  hasExpandedPlayer,
+  autoPlayNext,
+  loopQueue,
   hasChannelOpen,
   onPlayTrack,
+  onStopPlay,
+  onEnded,
+  onExpandFull,
+  onToggleAutoPlay,
+  onToggleLoop,
   onToggleLike,
   onClearAll,
   onBack,
@@ -37,7 +53,6 @@ export function LikedPlaylistView({
 
   return (
     <main className="mx-auto max-w-[1360px] px-3 pb-16 pt-5 sm:px-6 sm:pt-6">
-      {/* Header */}
       <div className="flex flex-col gap-4 border-b border-[#E5E3DD] pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <button
@@ -59,11 +74,11 @@ export function LikedPlaylistView({
         </div>
 
         {likedItems.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => onPlayTrack(likedItems[0], false)}
-              className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-lg bg-[#E11D48] px-4 text-sm font-medium text-white transition-colors hover:bg-[#BE123C] sm:h-10 whitespace-nowrap"
+              className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-[#E11D48] px-4 text-sm font-medium text-white transition-colors hover:bg-[#BE123C] whitespace-nowrap"
             >
               <Play className="h-4 w-4 fill-current" />
               <span>Play All</span>
@@ -75,10 +90,35 @@ export function LikedPlaylistView({
                 const pick = likedItems[Math.floor(Math.random() * likedItems.length)];
                 if (pick) onPlayTrack(pick, true);
               }}
-              className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-lg border border-[#E5E3DD] bg-white px-4 text-sm font-medium text-[#111111] transition-colors hover:border-[#111111] sm:h-10 whitespace-nowrap"
+              className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-[#E5E3DD] bg-white px-3.5 text-sm font-medium text-[#111111] transition-colors hover:border-[#111111] whitespace-nowrap"
             >
               <Shuffle className="h-4 w-4" />
               <span>Shuffle</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onToggleAutoPlay}
+              className={`inline-flex h-10 cursor-pointer items-center rounded-lg border px-3 text-xs font-medium transition-colors whitespace-nowrap ${
+                autoPlayNext
+                  ? 'border-[#111111] bg-[#111111] text-white'
+                  : 'border-[#E5E3DD] bg-white text-[#5C5A55]'
+              }`}
+            >
+              Auto-Play: {autoPlayNext ? 'On' : 'Off'}
+            </button>
+
+            <button
+              type="button"
+              onClick={onToggleLoop}
+              className={`inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors whitespace-nowrap ${
+                loopQueue
+                  ? 'border-[#111111] bg-[#111111] text-white'
+                  : 'border-[#E5E3DD] bg-white text-[#5C5A55]'
+              }`}
+            >
+              <Repeat className="h-3.5 w-3.5" />
+              <span>Loop</span>
             </button>
 
             {confirmClear ? (
@@ -89,14 +129,14 @@ export function LikedPlaylistView({
                     onClearAll();
                     setConfirmClear(false);
                   }}
-                  className="inline-flex h-11 cursor-pointer items-center rounded-lg bg-[#111111] px-3.5 text-xs font-medium text-white hover:bg-[#E11D48] sm:h-10 whitespace-nowrap"
+                  className="inline-flex h-10 cursor-pointer items-center rounded-lg bg-[#111111] px-3.5 text-xs font-medium text-white hover:bg-[#E11D48] whitespace-nowrap"
                 >
                   Confirm Clear
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmClear(false)}
-                  className="inline-flex h-11 cursor-pointer items-center rounded-lg border border-[#E5E3DD] bg-white px-3 text-xs font-medium text-[#5C5A55] sm:h-10 whitespace-nowrap"
+                  className="inline-flex h-10 cursor-pointer items-center rounded-lg border border-[#E5E3DD] bg-white px-3 text-xs font-medium text-[#5C5A55] whitespace-nowrap"
                 >
                   Cancel
                 </button>
@@ -106,10 +146,9 @@ export function LikedPlaylistView({
                 type="button"
                 onClick={() => setConfirmClear(true)}
                 aria-label="Clear liked playlist"
-                className="inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-lg border border-[#E5E3DD] bg-white px-3 text-sm font-medium text-[#5C5A55] transition-colors hover:border-[#E11D48] hover:text-[#E11D48] sm:h-10 whitespace-nowrap"
+                className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-[#E5E3DD] bg-white px-3 text-sm font-medium text-[#5C5A55] transition-colors hover:border-[#E11D48] hover:text-[#E11D48] whitespace-nowrap"
               >
                 <Trash2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Clear</span>
               </button>
             )}
           </div>
@@ -155,8 +194,12 @@ export function LikedPlaylistView({
               key={item.id}
               item={item}
               isPlaying={playingItem?.id === item.id}
+              suppressInlineFrame={hasExpandedPlayer}
               isLiked={true}
               onPlay={(clicked) => onPlayTrack(clicked, false)}
+              onStopPlay={onStopPlay}
+              onEnded={onEnded}
+              onExpandFull={onExpandFull}
               onToggleLike={onToggleLike}
             />
           ))}

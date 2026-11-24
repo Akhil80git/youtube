@@ -65,7 +65,9 @@ function readText(node: unknown): string {
   if (typeof n.content === 'string') return n.content;
   if (Array.isArray(n.runs)) {
     return n.runs
-      .map((r) => (typeof (r as { text?: unknown }).text === 'string' ? (r as { text: string }).text : ''))
+      .map((r) =>
+        typeof (r as { text?: unknown }).text === 'string' ? (r as { text: string }).text : ''
+      )
       .join('');
   }
   return '';
@@ -128,7 +130,6 @@ export async function resolveChannelPath(rawQuery: string): Promise<string> {
     throw new Error('Please enter a channel name, @handle, or YouTube URL.');
   }
 
-  // Handle direct URLs (only YouTube domains allowed)
   if (/^https?:\/\//i.test(q) || /^(www\.|m\.)?youtube\.com\//i.test(q)) {
     const withProto = /^https?:\/\//i.test(q) ? q : `https://${q}`;
     let parsed: URL;
@@ -157,7 +158,6 @@ export async function resolveChannelPath(rawQuery: string): Promise<string> {
       const cleanName = segments[1].replace(/[^a-zA-Z0-9._-]/g, '');
       if (cleanName) return `/${segments[0]}/${cleanName}`;
     }
-    // Single-segment legacy custom URL like youtube.com/Fireship
     const legacy = segments[0].replace(/[^a-zA-Z0-9._-]/g, '');
     if (legacy && !['watch', 'shorts', 'playlist', 'results', 'feed'].includes(legacy.toLowerCase())) {
       return `/@${legacy}`;
@@ -165,25 +165,21 @@ export async function resolveChannelPath(rawQuery: string): Promise<string> {
     throw new Error('Could not detect a channel from that URL. Try a channel URL like youtube.com/@Fireship.');
   }
 
-  // Handle @handle directly
   if (q.startsWith('@')) {
     const cleanHandle = q.replace(/[^a-zA-Z0-9._@-]/g, '');
     if (cleanHandle.length < 2) throw new Error('Invalid channel handle.');
     return `/${cleanHandle}`;
   }
 
-  // Handle UC... channel ID directly
   if (/^UC[a-zA-Z0-9_-]{20,30}$/.test(q)) {
     return `/channel/${q}`;
   }
 
-  // Plain text search -> find best matching channel
   const results = await searchChannels(q);
   if (results.length > 0) {
     return results[0].path;
   }
 
-  // Fallback: try as @handle if single token
   const handleGuess = q.replace(/[^a-zA-Z0-9._-]/g, '');
   if (handleGuess.length >= 2) {
     return `/@${handleGuess}`;
@@ -341,7 +337,6 @@ function parseMediaNode(
 ): MediaItem | null {
   if (!content || typeof content !== 'object') return null;
 
-  // Modern YouTube lockupViewModel
   if (content.lockupViewModel && content.lockupViewModel.contentType !== 'LOCKUP_CONTENT_TYPE_PLAYLIST') {
     const vm = content.lockupViewModel;
     const videoId = typeof vm.contentId === 'string' ? vm.contentId : '';
@@ -372,6 +367,7 @@ function parseMediaNode(
 
     let viewsText = '';
     let publishedText = '';
+    let channelTitle = '';
     for (const row of rows) {
       const parts = row?.metadataParts || [];
       for (const part of parts) {
@@ -382,13 +378,21 @@ function parseMediaNode(
           isLiveNow = true;
         } else if (/ago|streamed|premiered|scheduled/i.test(txt)) {
           publishedText = txt;
-        } else if (!viewsText && (/\d/.test(txt) || /view/i.test(txt))) {
-          viewsText = /view/i.test(txt) ? txt : `${txt} views`;
+        } else if (/\d/.test(txt) || /view/i.test(txt)) {
+          if (!viewsText) viewsText = /view/i.test(txt) ? txt : `${txt} views`;
+        } else if (!channelTitle && !publishedText) {
+          channelTitle = txt;
         } else if (!publishedText) {
           publishedText = txt;
         }
       }
     }
+
+    const avatarNav =
+      metaVm?.image?.decoratedAvatarViewModel?.rendererContext?.commandContext?.onTap
+        ?.innertubeCommand?.commandMetadata?.webCommandMetadata?.url;
+    const channelPath =
+      typeof avatarNav === 'string' && avatarNav.startsWith('/') ? avatarNav : undefined;
 
     return {
       id: videoId,
@@ -399,10 +403,11 @@ function parseMediaNode(
       publishedText,
       type: defaultType,
       isLiveNow,
+      ...(channelTitle ? { channelTitle } : {}),
+      ...(channelPath ? { channelPath } : {}),
     };
   }
 
-  // Shorts lockupViewModel
   if (content.shortsLockupViewModel) {
     const s = content.shortsLockupViewModel;
     const videoId = s.onTap?.innertubeCommand?.reelWatchEndpoint?.videoId || '';
@@ -427,7 +432,6 @@ function parseMediaNode(
     };
   }
 
-  // Classic videoRenderer / gridVideoRenderer / playlistVideoRenderer
   const v = content.videoRenderer || content.gridVideoRenderer || content.playlistVideoRenderer;
   if (v && typeof v.videoId === 'string' && /^[a-zA-Z0-9_-]{11}$/.test(v.videoId)) {
     const thumbnail =
@@ -446,6 +450,13 @@ function parseMediaNode(
       }
     }
 
+    const bylineNode = v.ownerText || v.longBylineText || v.shortBylineText;
+    const channelTitle = readText(bylineNode);
+    const bylineUrl =
+      bylineNode?.runs?.[0]?.navigationEndpoint?.commandMetadata?.webCommandMetadata?.url;
+    const channelPath =
+      typeof bylineUrl === 'string' && bylineUrl.startsWith('/') ? bylineUrl : undefined;
+
     return {
       id: v.videoId,
       title: readText(v.title) || 'Untitled video',
@@ -455,10 +466,11 @@ function parseMediaNode(
       publishedText: readText(v.publishedTimeText),
       type: defaultType,
       isLiveNow,
+      ...(channelTitle ? { channelTitle } : {}),
+      ...(channelPath ? { channelPath } : {}),
     };
   }
 
-  // Classic reelItemRenderer (Shorts)
   if (content.reelItemRenderer) {
     const r = content.reelItemRenderer;
     const videoId = r.videoId || '';
@@ -487,7 +499,8 @@ function parsePlaylistNode(content: any): PlaylistCard | null {
     const id = typeof vm.contentId === 'string' ? vm.contentId : '';
     if (!/^[a-zA-Z0-9_-]{10,64}$/.test(id)) return null;
 
-    const primaryThumb = vm.contentImage?.collectionThumbnailViewModel?.primaryThumbnail?.thumbnailViewModel;
+    const primaryThumb =
+      vm.contentImage?.collectionThumbnailViewModel?.primaryThumbnail?.thumbnailViewModel;
     const thumbnail = pickBestThumbnail(primaryThumb?.image?.sources);
 
     let videoCountText = '';
@@ -550,8 +563,7 @@ function extractItemsAndContinuation(
 
   for (const entry of rawList) {
     if (entry?.continuationItemRenderer) {
-      const tok =
-        entry.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token;
+      const tok = entry.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token;
       if (typeof tok === 'string' && tok) {
         nextToken = tok;
       }
@@ -590,31 +602,6 @@ function parseAboutInfo(data: Record<string, unknown>, channel: ChannelInfo): Ch
       if (vm) break;
     }
     if (vm) break;
-  }
-
-  // Fallback inside tabRenderer content
-  if (!vm) {
-    const tabs = (data.contents as any)?.twoColumnBrowseResultsRenderer?.tabs || [];
-    for (const t of tabs) {
-      const secContents = t?.tabRenderer?.content?.sectionListRenderer?.contents || [];
-      for (const sec of secContents) {
-        const items = sec?.itemSectionRenderer?.contents || [];
-        for (const item of items) {
-          if (item?.channelAboutFullMetadataRenderer) {
-            const m = item.channelAboutFullMetadataRenderer;
-            return {
-              description: readText(m.description) || channel.description,
-              country: readText(m.country),
-              joinedDateText: readText(m.joinedDateText),
-              viewCountText: readText(m.viewCountText),
-              subscriberCountText: channel.subscribersText,
-              videoCountText: channel.videoCountText,
-              links: [],
-            };
-          }
-        }
-      }
-    }
   }
 
   const links: { title: string; url: string }[] = [];
@@ -704,10 +691,7 @@ export async function fetchChannelTab(
     items,
     playlists,
     about: null,
-    continuation:
-      nextToken && apiKey
-        ? { token: nextToken, apiKey, clientVersion }
-        : null,
+    continuation: nextToken && apiKey ? { token: nextToken, apiKey, clientVersion } : null,
   };
 }
 
@@ -839,9 +823,215 @@ export async function fetchPlaylistDetail(listId: string): Promise<PlaylistDetai
     viewsText,
     description,
     videos: items,
-    continuation:
-      nextToken && apiKey
-        ? { token: nextToken, apiKey, clientVersion }
-        : null,
+    continuation: nextToken && apiKey ? { token: nextToken, apiKey, clientVersion } : null,
   };
 }
+
+export async function searchVideos(query: string, limit = 20): Promise<MediaItem[]> {
+  const trimmed = query.trim();
+  if (!trimmed || trimmed.length > 100) return [];
+
+  const html = await fetchYoutubeHtml(
+    `/results?search_query=${encodeURIComponent(trimmed)}&sp=EgIQAQ%3D%3D`
+  );
+  const { data } = extractYtData(html);
+
+  const sections =
+    (data.contents as any)?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer
+      ?.contents || [];
+
+  const results: MediaItem[] = [];
+  const seen = new Set<string>();
+
+  for (const sec of sections) {
+    const items = sec?.itemSectionRenderer?.contents || [];
+    for (const item of items) {
+      const parsed = parseMediaNode(item, 'video');
+      if (!parsed || seen.has(parsed.id)) continue;
+      seen.add(parsed.id);
+      results.push(parsed);
+      if (results.length >= limit) break;
+    }
+    if (results.length >= limit) break;
+  }
+
+  return results;
+}
+
+export async function searchAllVideos(
+  query: string,
+  includeChannels = true
+): Promise<import('../src/types.ts').SearchVideosResponse> {
+  const trimmed = query.trim();
+  if (!trimmed || trimmed.length > 100) {
+    return { query: trimmed, videos: [], channels: [], continuation: null };
+  }
+
+  const videoPromise = (async () => {
+    const html = await fetchYoutubeHtml(
+      `/results?search_query=${encodeURIComponent(trimmed)}&sp=EgIQAQ%3D%3D`
+    );
+    const { data, apiKey, clientVersion } = extractYtData(html);
+
+    const sections =
+      (data.contents as any)?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer
+        ?.contents || [];
+
+    const videos: MediaItem[] = [];
+    const seen = new Set<string>();
+    let nextToken = '';
+
+    for (const sec of sections) {
+      if (sec?.continuationItemRenderer) {
+        const tok =
+          sec.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token;
+        if (typeof tok === 'string' && tok) nextToken = tok;
+        continue;
+      }
+
+      const items = sec?.itemSectionRenderer?.contents || [];
+      for (const item of items) {
+        const parsed = parseMediaNode(item, 'video');
+        if (!parsed || seen.has(parsed.id)) continue;
+        seen.add(parsed.id);
+        videos.push(parsed);
+      }
+    }
+
+    return {
+      videos,
+      continuation: nextToken && apiKey ? { token: nextToken, apiKey, clientVersion } : null,
+    };
+  })();
+
+  const channelPromise = includeChannels
+    ? searchChannels(trimmed).catch(() => [])
+    : Promise.resolve([]);
+
+  const [videoRes, channels] = await Promise.all([videoPromise, channelPromise]);
+
+  return {
+    query: trimmed,
+    videos: videoRes.videos,
+    channels: channels.slice(0, 4),
+    continuation: videoRes.continuation,
+  };
+}
+
+export async function fetchSearchContinuation(
+  continuation: ContinuationInfo
+): Promise<{
+  videos: MediaItem[];
+  continuation: ContinuationInfo | null;
+}> {
+  const { token, apiKey, clientVersion } = continuation;
+  if (!/^[a-zA-Z0-9_-]{10,80}$/.test(apiKey)) {
+    throw new Error('Invalid continuation key.');
+  }
+  if (!/^[0-9.]{3,32}$/.test(clientVersion)) {
+    throw new Error('Invalid client version.');
+  }
+  if (!token || token.length > 4096) {
+    throw new Error('Invalid continuation token.');
+  }
+
+  const res = await fetch(
+    `${YOUTUBE_ORIGIN}/youtubei/v1/search?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...REQUEST_HEADERS,
+      },
+      body: JSON.stringify({
+        context: {
+          client: {
+            clientName: 'WEB',
+            clientVersion,
+            hl: 'en',
+            gl: 'US',
+          },
+        },
+        continuation: token,
+      }),
+      signal: AbortSignal.timeout(12000),
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(`Failed to load more results (${res.status}).`);
+  }
+
+  const json = (await res.json()) as any;
+  const cmds = json?.onResponseReceivedCommands || json?.onResponseReceivedActions || [];
+
+  const videos: MediaItem[] = [];
+  const seen = new Set<string>();
+  let nextToken = '';
+
+  for (const cmd of cmds) {
+    const entries = cmd?.appendContinuationItemsAction?.continuationItems || [];
+    for (const entry of entries) {
+      if (entry?.continuationItemRenderer) {
+        const tok =
+          entry.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token;
+        if (typeof tok === 'string' && tok) nextToken = tok;
+        continue;
+      }
+      const items = entry?.itemSectionRenderer?.contents || [];
+      for (const item of items) {
+        const parsed = parseMediaNode(item, 'video');
+        if (!parsed || seen.has(parsed.id)) continue;
+        seen.add(parsed.id);
+        videos.push(parsed);
+      }
+    }
+  }
+
+  return {
+    videos,
+    continuation: nextToken ? { token: nextToken, apiKey, clientVersion } : null,
+  };
+}
+
+const DEFAULT_FEED_SEEDS = [
+  'latest hit songs music',
+  'lofi chill beats mix',
+  'trending tech explained',
+  'live acoustic music session',
+];
+
+export async function fetchPersonalizedFeed(
+  rawSeeds: string[],
+  excludeIds: Set<string>
+): Promise<{ items: MediaItem[]; seedsUsed: string[] }> {
+  const cleanedSeeds = rawSeeds
+    .map((s) => s.trim().slice(0, 80))
+    .filter((s) => s.length >= 2);
+
+  const seedsUsed =
+    cleanedSeeds.length > 0 ? cleanedSeeds.slice(0, 4) : DEFAULT_FEED_SEEDS.slice(0, 4);
+
+  const settled = await Promise.allSettled(seedsUsed.map((seed) => searchVideos(seed, 12)));
+  const buckets: MediaItem[][] = settled.map((res) =>
+    res.status === 'fulfilled' ? res.value : []
+  );
+
+  const merged: MediaItem[] = [];
+  const seen = new Set<string>(excludeIds);
+  const maxLen = Math.max(0, ...buckets.map((b) => b.length));
+
+  for (let i = 0; i < maxLen; i += 1) {
+    for (const bucket of buckets) {
+      const vid = bucket[i];
+      if (!vid || seen.has(vid.id)) continue;
+      seen.add(vid.id);
+      merged.push(vid);
+      if (merged.length >= 40) break;
+    }
+    if (merged.length >= 40) break;
+  }
+
+  return { items: merged, seedsUsed };
+}
+

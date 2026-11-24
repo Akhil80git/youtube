@@ -1,4 +1,13 @@
-import { ArrowLeft, ExternalLink, Globe, Loader2, Play, Search } from 'lucide-react';
+import {
+  ArrowLeft,
+  ExternalLink,
+  Globe,
+  Loader2,
+  Play,
+  Search,
+  UserCheck,
+  UserPlus,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type {
   ChannelAbout,
@@ -21,15 +30,21 @@ interface ChannelViewProps {
   loadingMore: boolean;
   loadingAll: boolean;
   playingItem: MediaItem | null;
+  hasExpandedPlayer: boolean;
   activePlaylist: PlaylistDetailResponse | null;
   loadingPlaylist: boolean;
+  isFollowed: boolean;
   isLiked: (id: string) => boolean;
+  onToggleFollow: (channel: ChannelInfo) => void;
   onToggleLike: (item: MediaItem) => void;
   onChangeTab: (tab: ChannelTab) => void;
   onLoadMore: () => void;
   onLoadAll: () => void;
   onStopLoadAll: () => void;
   onPlayItem: (item: MediaItem, customQueue?: MediaItem[], queueLabel?: string) => void;
+  onStopPlay: () => void;
+  onEnded: () => void;
+  onExpandFull: (item: MediaItem, initialRotation: 0 | 90 | 180 | 270) => void;
   onOpenPlaylist: (playlist: PlaylistCard) => void;
   onClosePlaylist: () => void;
 }
@@ -65,15 +80,21 @@ export function ChannelView({
   loadingMore,
   loadingAll,
   playingItem,
+  hasExpandedPlayer,
   activePlaylist,
   loadingPlaylist,
+  isFollowed,
   isLiked,
+  onToggleFollow,
   onToggleLike,
   onChangeTab,
   onLoadMore,
   onLoadAll,
   onStopLoadAll,
   onPlayItem,
+  onStopPlay,
+  onEnded,
+  onExpandFull,
   onOpenPlaylist,
   onClosePlaylist,
 }: ChannelViewProps) {
@@ -146,16 +167,32 @@ export function ChannelView({
           </div>
         </div>
 
-        {items.length > 0 && activeTab !== 'playlists' && activeTab !== 'about' && (
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            onClick={() => onPlayItem(items[0])}
-            className="inline-flex h-11 w-full shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#E11D48] px-4 text-sm font-medium text-white transition-colors hover:bg-[#BE123C] sm:h-10 sm:w-auto whitespace-nowrap"
+            onClick={() => onToggleFollow(channel)}
+            aria-pressed={isFollowed}
+            className={`inline-flex h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors sm:h-10 sm:flex-initial whitespace-nowrap ${
+              isFollowed
+                ? 'border-[#111111] bg-[#111111] text-white hover:bg-[#27272A]'
+                : 'border-[#E5E3DD] bg-white text-[#111111] hover:border-[#111111]'
+            }`}
           >
-            <Play className="h-4 w-4 fill-current" />
-            <span>Play Latest</span>
+            {isFollowed ? <UserCheck className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+            <span>{isFollowed ? 'Following' : 'Follow'}</span>
           </button>
-        )}
+
+          {items.length > 0 && activeTab !== 'playlists' && activeTab !== 'about' && (
+            <button
+              type="button"
+              onClick={() => onPlayItem(items[0])}
+              className="inline-flex h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#E11D48] px-4 text-sm font-medium text-white transition-colors hover:bg-[#BE123C] sm:h-10 sm:flex-initial whitespace-nowrap"
+            >
+              <Play className="h-4 w-4 fill-current" />
+              <span>Play Latest</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs + In-Channel Filter Row */}
@@ -364,10 +401,14 @@ export function ChannelView({
                   key={vid.id}
                   item={vid}
                   isPlaying={playingItem?.id === vid.id}
+                  suppressInlineFrame={hasExpandedPlayer}
                   isLiked={isLiked(vid.id)}
                   onPlay={(item) =>
                     onPlayItem(item, activePlaylist.videos, activePlaylist.title)
                   }
+                  onStopPlay={onStopPlay}
+                  onEnded={onEnded}
+                  onExpandFull={onExpandFull}
                   onToggleLike={onToggleLike}
                 />
               ))}
@@ -404,8 +445,12 @@ export function ChannelView({
                 key={item.id}
                 item={item}
                 isPlaying={playingItem?.id === item.id}
+                suppressInlineFrame={hasExpandedPlayer}
                 isLiked={isLiked(item.id)}
                 onPlay={(clicked) => onPlayItem(clicked)}
+                onStopPlay={onStopPlay}
+                onEnded={onEnded}
+                onExpandFull={onExpandFull}
                 onToggleLike={onToggleLike}
               />
             ))}

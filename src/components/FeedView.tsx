@@ -1,0 +1,186 @@
+import { ArrowLeft, Compass, Loader2, Play, RefreshCw } from 'lucide-react';
+import type { MediaItem } from '../types';
+import { MediaCard } from './MediaCard';
+
+interface FeedViewProps {
+  items: MediaItem[];
+  seeds: string[];
+  activeSeed: string | null;
+  personalized: boolean;
+  loading: boolean;
+  error: string | null;
+  playingItem: MediaItem | null;
+  hasExpandedPlayer: boolean;
+  hasChannelOpen: boolean;
+  isLiked: (id: string) => boolean;
+  onSelectSeed: (seed: string | null) => void;
+  onRefresh: () => void;
+  onPlayItem: (item: MediaItem, queue: MediaItem[]) => void;
+  onStopPlay: () => void;
+  onEnded: () => void;
+  onExpandFull: (item: MediaItem, initialRotation: 0 | 90 | 180 | 270) => void;
+  onToggleLike: (item: MediaItem) => void;
+  onOpenChannel: (path: string) => void;
+  onBack: () => void;
+}
+
+export function FeedView({
+  items,
+  seeds,
+  activeSeed,
+  personalized,
+  loading,
+  error,
+  playingItem,
+  hasExpandedPlayer,
+  hasChannelOpen,
+  isLiked,
+  onSelectSeed,
+  onRefresh,
+  onPlayItem,
+  onStopPlay,
+  onEnded,
+  onExpandFull,
+  onToggleLike,
+  onOpenChannel,
+  onBack,
+}: FeedViewProps) {
+  return (
+    <main className="mx-auto max-w-[1360px] px-3 pb-16 pt-5 sm:px-6 sm:pt-6">
+      <div className="flex flex-col gap-4 border-b border-[#E5E3DD] pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <button
+            type="button"
+            onClick={onBack}
+            className="mb-3 inline-flex min-h-[36px] cursor-pointer items-center gap-1.5 text-xs font-medium text-[#5C5A55] hover:text-[#111111]"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>{hasChannelOpen ? 'Back to Channel' : 'Back to Home'}</span>
+          </button>
+
+          <h1 className="font-display text-2xl font-bold tracking-tight text-[#111111] sm:text-3xl">
+            For You Feed
+          </h1>
+          <p className="mt-1 text-sm text-[#5C5A55]">
+            {personalized
+              ? 'Songs and videos picked across all channels from what you watch and like'
+              : 'Popular mixes across YouTube · Watch or like videos to tailor this feed'}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={loading}
+            className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-[#E5E3DD] bg-white px-3.5 text-sm font-medium text-[#111111] transition-colors hover:border-[#111111] disabled:opacity-50 whitespace-nowrap"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
+
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onPlayItem(items[0], items)}
+              className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-[#E11D48] px-4 text-sm font-medium text-white transition-colors hover:bg-[#BE123C] whitespace-nowrap"
+            >
+              <Play className="h-4 w-4 fill-current" />
+              <span>Play All</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {seeds.length > 0 && (
+        <div className="mt-4 flex items-center gap-1.5 overflow-x-auto pb-1">
+          <button
+            type="button"
+            onClick={() => onSelectSeed(null)}
+            className={`min-h-[36px] cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+              activeSeed === null
+                ? 'bg-[#111111] text-white'
+                : 'border border-[#E5E3DD] bg-white text-[#5C5A55] hover:border-[#111111] hover:text-[#111111]'
+            }`}
+          >
+            All Mix
+          </button>
+          {seeds.map((seed) => (
+            <button
+              key={seed}
+              type="button"
+              onClick={() => onSelectSeed(seed)}
+              className={`max-w-[200px] min-h-[36px] cursor-pointer truncate rounded-lg px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                activeSeed === seed
+                  ? 'bg-[#111111] text-white'
+                  : 'border border-[#E5E3DD] bg-white text-[#5C5A55] hover:border-[#111111] hover:text-[#111111]'
+              }`}
+            >
+              {seed}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {error && (
+        <div
+          role="alert"
+          className="mt-5 rounded-xl border border-[#E11D48]/30 bg-[#E11D48]/5 px-4 py-3 text-sm text-[#BE123C]"
+        >
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="mt-6 grid grid-cols-1 gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="animate-pulse space-y-2.5">
+              <div className="aspect-video w-full rounded-xl bg-[#EAE7E1]" />
+              <div className="h-4 w-5/6 rounded bg-[#EAE7E1]" />
+              <div className="h-3 w-1/2 rounded bg-[#EAE7E1]" />
+            </div>
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="mx-auto mt-14 max-w-md rounded-2xl border border-[#E5E3DD] bg-white p-8 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#FAF9F7] text-[#111111]">
+            <Compass className="h-5 w-5" />
+          </div>
+          <h2 className="font-display text-lg font-semibold text-[#111111]">
+            Nothing in your feed yet
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-[#5C5A55]">
+            Search any channel and play or like a few songs and videos. Your personalized feed will
+            automatically populate here.
+          </p>
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="mt-5 inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-[#111111] px-4 text-xs font-medium text-white hover:bg-[#E11D48]"
+          >
+            <Loader2 className="hidden h-3.5 w-3.5" />
+            <span>Load Discovery Mix</span>
+          </button>
+        </div>
+      ) : (
+        <div className="mt-6 grid grid-cols-1 gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {items.map((item) => (
+            <MediaCard
+              key={item.id}
+              item={item}
+              isPlaying={playingItem?.id === item.id}
+              suppressInlineFrame={hasExpandedPlayer}
+              isLiked={isLiked(item.id)}
+              onPlay={(clicked) => onPlayItem(clicked, items)}
+              onStopPlay={onStopPlay}
+              onEnded={onEnded}
+              onExpandFull={onExpandFull}
+              onToggleLike={onToggleLike}
+              onOpenChannel={onOpenChannel}
+            />
+          ))}
+        </div>
+      )}
+    </main>
+  );
+}

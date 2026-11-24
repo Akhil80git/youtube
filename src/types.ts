@@ -24,10 +24,33 @@ export interface MediaItem {
   type: 'video' | 'short' | 'live';
   isLiveNow?: boolean;
   channelTitle?: string;
+  channelPath?: string;
+}
+
+export interface FeedResponse {
+  items: MediaItem[];
+  seedsUsed: string[];
+}
+
+export interface SearchVideosResponse {
+  query: string;
+  videos: MediaItem[];
+  channels: ChannelSearchResult[];
+  continuation: ContinuationInfo | null;
 }
 
 export interface LikedItem extends MediaItem {
   likedAt: number;
+}
+
+export interface FollowedChannel {
+  id: string;
+  title: string;
+  handle: string;
+  path: string;
+  avatar: string;
+  subscribersText?: string;
+  followedAt: number;
 }
 
 export interface PlaylistCard {

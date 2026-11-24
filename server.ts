@@ -5,7 +5,10 @@ import { fileURLToPath } from 'url';
 import {
   fetchChannelContinuation,
   fetchChannelTab,
+  fetchPersonalizedFeed,
   fetchPlaylistDetail,
+  fetchSearchContinuation,
+  searchAllVideos,
   searchChannels,
 } from './server/youtube.ts';
 import type { ChannelTab } from './src/types.ts';
@@ -39,6 +42,43 @@ async function startServer() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to search channels.';
       return res.status(500).json({ error: message });
+    }
+  });
+
+  app.get('/api/search-videos', async (req, res) => {
+    try {
+      const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+      const includeChannels = req.query.channels !== '0';
+      if (!q) {
+        return res.json({ query: '', videos: [], channels: [], continuation: null });
+      }
+      if (q.length > 100) {
+        return res.status(400).json({ error: 'Search query is too long.' });
+      }
+      const data = await searchAllVideos(q, includeChannels);
+      return res.json(data);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to search videos.';
+      return res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/search-videos/more', async (req, res) => {
+    try {
+      const { continuation } = req.body ?? {};
+      if (
+        !continuation ||
+        typeof continuation.token !== 'string' ||
+        typeof continuation.apiKey !== 'string' ||
+        typeof continuation.clientVersion !== 'string'
+      ) {
+        return res.status(400).json({ error: 'Missing pagination parameters.' });
+      }
+      const data = await fetchSearchContinuation(continuation);
+      return res.json(data);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to load more results.';
+      return res.status(400).json({ error: message });
     }
   });
 
@@ -97,6 +137,32 @@ async function startServer() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unable to load playlist.';
       return res.status(400).json({ error: message });
+    }
+  });
+
+  app.get('/api/feed', async (req, res) => {
+    try {
+      const rawSeeds = typeof req.query.seeds === 'string' ? req.query.seeds : '';
+      const rawExclude = typeof req.query.exclude === 'string' ? req.query.exclude : '';
+
+      const seeds = rawSeeds
+        .split('||')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, 5);
+
+      const excludeIds = new Set(
+        rawExclude
+          .split(',')
+          .map((id) => id.trim())
+          .filter((id) => /^[a-zA-Z0-9_-]{11}$/.test(id))
+      );
+
+      const data = await fetchPersonalizedFeed(seeds, excludeIds);
+      return res.json(data);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to load feed.';
+      return res.status(500).json({ error: message });
     }
   });
 
