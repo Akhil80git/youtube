@@ -1,0 +1,6 @@
+{
+  "name": "ChannelPlay",
+  "description": "Clean distraction-free channel browser and instant inline video player.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
